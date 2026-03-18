@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Institution {
+  id            String    @id @default(cuid())
+  name          String
+  leiCode       String?   @unique
+  jurisdiction  String
+  entityType    String
+  walletAddress String?
+  kycStatus     KycStatus @default(VERIFIED)
+  amlStatus     AmlStatus @default(CLEAR)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  mintRequests      MintRequest[]
+  redeemRequests    RedeemRequest[]
+  complianceRecords ComplianceRecord[]
+}
+
+model StablecoinMint {
+  id          String   @id @default(cuid())
+  symbol      String   @unique
+  name        String
+  mintAddress String   @unique
+  decimals    Int      @default(6)
+  network     String   @default("devnet")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  mintRequests   MintRequest[]
+  redeemRequests RedeemRequest[]
+}
+
+model MintRequest {
+  id               String           @id @default(cuid())
+  institutionId    String
+  stablecoinMintId String
+  amount           Float
+  destinationWallet String
+  status           RequestStatus    @default(PENDING)
+  txSignature      String?
+  txError          String?
+  complianceStatus ComplianceStatus @default(PENDING)
+  kycVerified      Boolean          @default(false)
+  travelRuleData   Json?
+  amlScreening     Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  institution      Institution      @relation(fields: [institutionId], references: [id])
+  stablecoin       StablecoinMint   @relation(fields: [stablecoinMintId], references: [id])
+  complianceRecord ComplianceRecord?
+}
+
+model RedeemRequest {
+  id                    String           @id @default(cuid())
+  institutionId         String
+  stablecoinMintId      String
+  amount                Float
+  sourceWallet          String
+  destinationBankAccount String?
+  status                RequestStatus    @default(PENDING)
+  txSignature           String?
+  txError               String?
+  complianceStatus      ComplianceStatus @default(PENDING)
+  kycVerified           Boolean          @default(false)
+  travelRuleData        Json?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  institution  Institution    @relation(fields: [institutionId], references: [id])
+  stablecoin   StablecoinMint @relation(fields: [stablecoinMintId], references: [id])
+}
+
+model ComplianceRecord {
+  id            String           @id @default(cuid())
+  institutionId String
+  mintRequestId String?          @unique
+  recordType    String
+  status        ComplianceStatus @default(PENDING)
+  riskScore     Int?
+  jurisdiction  String?
+  travelRuleData Json?
+  kycData       Json?
+  amlData       Json?
+  fatfStatus    String?
+  ofacScreening String?
+  notes         String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  institution  Institution  @relation(fields: [institutionId], references: [id])
+  mintRequest  MintRequest? @relation(fields: [mintRequestId], references: [id])
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  EXPIRED
+}
+
+enum AmlStatus {
+  PENDING
+  CLEAR
+  FLAGGED
+  BLOCKED
+}
+
+enum RequestStatus {
+  PENDING
+  COMPLIANCE_REVIEW
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+enum ComplianceStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  REQUIRES_INFO
+}
