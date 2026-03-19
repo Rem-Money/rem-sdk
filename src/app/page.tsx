@@ -60,22 +60,6 @@ export default function DashboardPage() {
     load();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 skeleton rounded-xl" />
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="h-64 skeleton rounded-xl" />
-          <div className="h-64 skeleton rounded-xl" />
-        </div>
-      </div>
-    );
-  }
-
   const s = data?.stats;
 
   return (
@@ -95,39 +79,47 @@ export default function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="animate-fade-in stagger-1">
-          <StatCard
-            label="Total Minted"
-            value={fmt(s?.totalMinted ?? 0)}
-            sub="Lifetime across all stablecoins"
-            accent
-            icon={<ArrowUpCircle size={16} style={{ color: "var(--accent)" }} />}
-          />
-        </div>
-        <div className="animate-fade-in stagger-2">
-          <StatCard
-            label="Total Redeemed"
-            value={fmt(s?.totalRedeemed ?? 0)}
-            sub="Lifetime redemptions"
-            icon={<ArrowDownCircle size={16} style={{ color: "var(--info)" }} />}
-          />
-        </div>
-        <div className="animate-fade-in stagger-3">
-          <StatCard
-            label="Pending Compliance"
-            value={s?.pendingCompliance ?? 0}
-            sub="Requiring review"
-            icon={<ShieldCheck size={16} style={{ color: s?.pendingCompliance ? "var(--warning)" : "var(--success)" }} />}
-          />
-        </div>
-        <div className="animate-fade-in stagger-4">
-          <StatCard
-            label="Active Stablecoins"
-            value={s?.activeStablecoins ?? 0}
-            sub="On Solana Devnet"
-            icon={<Coins size={16} style={{ color: "var(--text-secondary)" }} />}
-          />
-        </div>
+        {loading ? (
+          [...Array(4)].map((_, i) => (
+            <div key={i} className="h-28 skeleton rounded-xl" />
+          ))
+        ) : (
+          <>
+            <div className="animate-fade-in stagger-1">
+              <StatCard
+                label="Total Minted"
+                value={fmt(s?.totalMinted ?? 0)}
+                sub="Lifetime across all stablecoins"
+                accent
+                icon={<ArrowUpCircle size={16} style={{ color: "var(--accent)" }} />}
+              />
+            </div>
+            <div className="animate-fade-in stagger-2">
+              <StatCard
+                label="Total Redeemed"
+                value={fmt(s?.totalRedeemed ?? 0)}
+                sub="Lifetime redemptions"
+                icon={<ArrowDownCircle size={16} style={{ color: "var(--info)" }} />}
+              />
+            </div>
+            <div className="animate-fade-in stagger-3">
+              <StatCard
+                label="Pending Compliance"
+                value={s?.pendingCompliance ?? 0}
+                sub="Requiring review"
+                icon={<ShieldCheck size={16} style={{ color: s?.pendingCompliance ? "var(--warning)" : "var(--success)" }} />}
+              />
+            </div>
+            <div className="animate-fade-in stagger-4">
+              <StatCard
+                label="Active Stablecoins"
+                value={s?.activeStablecoins ?? 0}
+                sub="On Solana Devnet"
+                icon={<Coins size={16} style={{ color: "var(--text-secondary)" }} />}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Quick actions */}
@@ -178,7 +170,28 @@ export default function DashboardPage() {
             />
           </div>
           <div className="px-2 pb-2">
-            {!data?.recentMintRequests?.length ? (
+            {loading ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...Array(4)].map((_, i) => (
+                    <tr key={i}>
+                      <td><div className="h-4 w-12 skeleton rounded" /></td>
+                      <td><div className="h-4 w-20 skeleton rounded" /></td>
+                      <td><div className="h-4 w-16 skeleton rounded" /></td>
+                      <td><div className="h-4 w-16 skeleton rounded" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : !data?.recentMintRequests?.length ? (
               <div className="text-center py-10" style={{ color: "var(--text-tertiary)" }}>
                 <ArrowUpCircle size={24} className="mx-auto mb-2 opacity-30" />
                 <p className="text-sm">No mint requests yet</p>
@@ -234,7 +247,28 @@ export default function DashboardPage() {
             />
           </div>
           <div className="px-2 pb-2">
-            {!data?.recentRedeemRequests?.length ? (
+            {loading ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...Array(4)].map((_, i) => (
+                    <tr key={i}>
+                      <td><div className="h-4 w-12 skeleton rounded" /></td>
+                      <td><div className="h-4 w-20 skeleton rounded" /></td>
+                      <td><div className="h-4 w-16 skeleton rounded" /></td>
+                      <td><div className="h-4 w-16 skeleton rounded" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : !data?.recentRedeemRequests?.length ? (
               <div className="text-center py-10" style={{ color: "var(--text-tertiary)" }}>
                 <ArrowDownCircle size={24} className="mx-auto mb-2 opacity-30" />
                 <p className="text-sm">No redeem requests yet</p>
@@ -283,7 +317,11 @@ export default function DashboardPage() {
         <Card>
           <SectionHeader title="Supported Stablecoins" subtitle="Devnet mint addresses" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {data?.stablecoins?.map((coin, i) => (
+            {loading ? (
+              [...Array(3)].map((_, i) => (
+                <div key={i} className="h-24 skeleton rounded-lg" />
+              ))
+            ) : data?.stablecoins?.map((coin, i) => (
               <div
                 key={coin.id}
                 className="p-4 rounded-lg"
