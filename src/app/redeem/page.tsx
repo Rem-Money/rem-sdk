@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowDownCircle,
   CheckCircle2,
@@ -12,11 +12,20 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
+  Globe,
+  Banknote,
 } from "lucide-react";
 import { Card, SectionHeader } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 import { formatDistanceToNow } from "date-fns";
+
+const NETWORKS = [
+  { id: "solana-devnet", label: "Solana Devnet", disabled: false },
+  { id: "solana-mainnet", label: "Solana Mainnet", disabled: true },
+  { id: "ethereum", label: "Ethereum Mainnet", disabled: true },
+  { id: "polygon", label: "Polygon", disabled: true },
+];
 
 interface RedeemRequest {
   id: string;
@@ -29,6 +38,10 @@ interface RedeemRequest {
   txError?: string;
   kycVerified: boolean;
   travelRuleData?: any;
+  amlScreening?: any;
+  fiatSettlementStatus: string;
+  fiatReference?: string;
+  fiatConfirmedAt?: string;
   createdAt: string;
   stablecoin: { symbol: string; name: string };
 }
@@ -51,14 +64,178 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function RedeemFlow({ request }: { request: RedeemRequest }) {
+function SelectField({
+  label, value, onChange, children, accentFocus = "info",
+}: {
+  label: string; value: string; onChange: (v: string) => void; children: React.ReactNode; accentFocus?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full py-2.5 px-3 pr-8 rounded-lg text-sm outline-none appearance-none cursor-pointer transition-all"
+          style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}
+          onFocus={(e) => (e.target.style.borderColor = `var(--${accentFocus})`)}
+          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+        >
+          {children}
+        </select>
+        <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-tertiary)" }} />
+      </div>
+    </div>
+  );
+}
+
+function InputField({
+  label, value, onChange, placeholder, prefix, icon: Icon, required = false, hint, type = "text", fontSize, accentFocus = "info",
+}: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+  prefix?: string; icon?: React.ElementType; required?: boolean; hint?: string;
+  type?: string; fontSize?: string; accentFocus?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+        {label}
+      </label>
+      <div className="relative">
+        {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{prefix}</span>}
+        {Icon && <Icon size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-tertiary)" }} />}
+        <input
+          type={type}
+          required={required}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full py-2.5 rounded-lg text-sm outline-none transition-all"
+          style={{
+            paddingLeft: (prefix || Icon) ? "1.75rem" : "0.75rem",
+            paddingRight: "0.75rem",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            color: "var(--text-primary)",
+            fontFamily: "var(--font-mono)",
+            fontSize: fontSize ?? "13px",
+          }}
+          onFocus={(e) => (e.target.style.borderColor = `var(--${accentFocus})`)}
+          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+        />
+      </div>
+      {hint && <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>{hint}</p>}
+    </div>
+  );
+}
+
+function SectionDivider({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1 pb-0.5">
+      <Icon size={12} style={{ color: "var(--text-tertiary)" }} />
+      <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+        {label}
+      </span>
+      <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+    </div>
+  );
+}
+
+function RedeemFlow({
+  request,
+  onFiatConfirmed,
+}: {
+  request: RedeemRequest;
+  onFiatConfirmed: () => void;
+}) {
+  const tr = (request.travelRuleData ?? {}) as any;
+  const settlement = tr.settlementDetails ?? {};
+  const [confirming, setConfirming] = useState(false);
+  const [confirmRef, setConfirmRef] = useState("");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  const onChainDone = ["ON_CHAIN_CONFIRMED", "FIAT_INITIATED", "COMPLETED"].includes(request.status);
+  const fiatInitiated = ["ON_CHAIN_CONFIRMED", "FIAT_INITIATED", "COMPLETED"].includes(request.status);
+  const fiatDone = request.status === "COMPLETED";
+  const awaitingFiatConfirm = request.status === "ON_CHAIN_CONFIRMED";
+
+  async function handleConfirmFiat() {
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      const res = await fetch(`/api/redeem-request/${request.id}/confirm-fiat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bankConfirmationRef: confirmRef || undefined, confirmedBy: "Institution Operator" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setConfirmError(data.error);
+      } else {
+        onFiatConfirmed();
+      }
+    } catch (e: any) {
+      setConfirmError(e.message);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   const steps = [
-    { id: 1, label: "Redeem Request Submitted", done: true, detail: `${fmt(request.amount)} ${request.stablecoin.symbol} redemption requested` },
-    { id: 2, label: "KYC Verified", done: request.kycVerified, detail: "Institution identity verified", badge: request.kycVerified ? "VERIFIED" : "PENDING" },
-    { id: 3, label: "Travel Rule Filed", done: !!request.travelRuleData, detail: request.travelRuleData ? `FATF Compliant · VASP: ${request.travelRuleData.vasp ?? "Apex Capital LLC"}` : "Travel rule data pending", badge: request.travelRuleData ? "COMPLIANT" : "PENDING" },
-    { id: 4, label: "Compliance Approved", done: request.complianceStatus === "APPROVED", detail: "AML/CFT checks passed", badge: request.complianceStatus },
-    { id: 5, label: "Tokens Burned / Locked", done: request.status === "COMPLETED", detail: request.txSignature ? `Tx: ${truncate(request.txSignature, 8)}` : "On-chain burn pending", txSig: request.txSignature, badge: request.status },
-    { id: 6, label: "Fiat Settlement", done: request.status === "COMPLETED", detail: request.status === "COMPLETED" ? "Fiat transfer initiated to settlement bank" : "Awaiting on-chain confirmation" },
+    {
+      id: 1, label: "Redeem Request Submitted", done: true,
+      detail: `${fmt(request.amount)} ${request.stablecoin.symbol} redemption requested`,
+    },
+    {
+      id: 2, label: "KYC Verified", done: request.kycVerified,
+      detail: "Institution identity verified",
+      badge: request.kycVerified ? "VERIFIED" : "PENDING",
+      blocked: !request.kycVerified,
+    },
+    {
+      id: 3, label: "AML Screening",
+      done: request.complianceStatus === "APPROVED",
+      detail: request.complianceStatus === "APPROVED"
+        ? `Risk score within threshold · OFAC / FinCEN / EU-Sanctions clear`
+        : request.complianceStatus === "IN_REVIEW"
+        ? "Under manual review — burn cannot proceed until cleared"
+        : "Pending",
+      badge: request.complianceStatus,
+      blocked: request.complianceStatus === "IN_REVIEW",
+    },
+    {
+      id: 4, label: "Travel Rule Filed", done: !!request.travelRuleData,
+      detail: request.travelRuleData
+        ? `FATF Compliant · VASP: ${tr.vasp ?? "Apex Capital LLC"}`
+        : "Travel rule data pending",
+      badge: request.travelRuleData ? "COMPLIANT" : "PENDING",
+    },
+    {
+      id: 5, label: "Tokens Burned On-chain", done: onChainDone,
+      detail: request.txSignature
+        ? `Burn confirmed · Tx: ${truncate(request.txSignature, 8)}`
+        : "Awaiting compliance approval",
+      txSig: request.txSignature,
+      badge: onChainDone ? "CONFIRMED" : request.status,
+    },
+    {
+      id: 6, label: "Fiat Wire Initiated", done: fiatInitiated,
+      detail: fiatInitiated
+        ? `Issuer instructed to wire ${settlement.paymentRails ?? "SWIFT"} to ${settlement.beneficiaryBank ?? "beneficiary bank"}${settlement.transferReference ? ` · Ref: ${settlement.transferReference}` : ""}`
+        : "Pending on-chain burn",
+      badge: fiatInitiated ? "INITIATED" : "PENDING",
+    },
+    {
+      id: 7, label: "Fiat Receipt Confirmed", done: fiatDone,
+      detail: fiatDone
+        ? `Funds received · ${(request as any).fiatReference ? `Bank ref: ${(request as any).fiatReference}` : "Settlement confirmed"}`
+        : awaitingFiatConfirm
+        ? "Confirm once funds arrive in your account"
+        : "Awaiting wire initiation",
+      awaitingConfirm: awaitingFiatConfirm,
+    },
   ];
 
   return (
@@ -66,24 +243,78 @@ function RedeemFlow({ request }: { request: RedeemRequest }) {
       {steps.map((step, idx) => (
         <div key={step.id} className="flex gap-3">
           <div className="flex flex-col items-center">
-            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10" style={{ background: step.done ? "var(--success-dim)" : "var(--bg-elevated)", border: `2px solid ${step.done ? "var(--success)" : "var(--border-bright)"}` }}>
-              {step.done ? <CheckCircle2 size={12} style={{ color: "var(--success)" }} /> : <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{step.id}</span>}
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10"
+              style={{
+                background: step.done
+                  ? "var(--success-dim)"
+                  : (step as any).blocked
+                  ? "rgba(244,63,94,0.12)"
+                  : "var(--bg-elevated)",
+                border: `2px solid ${step.done ? "var(--success)" : (step as any).blocked ? "var(--error)" : "var(--border-bright)"}`,
+              }}
+            >
+              {step.done
+                ? <CheckCircle2 size={12} style={{ color: "var(--success)" }} />
+                : (step as any).blocked
+                ? <XCircle size={12} style={{ color: "var(--error)" }} />
+                : <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{step.id}</span>
+              }
             </div>
-            {idx < steps.length - 1 && <div className="w-0.5 flex-1 my-1" style={{ background: step.done ? "var(--success)" : "var(--border)", opacity: step.done ? 0.4 : 1, minHeight: "20px" }} />}
+            {idx < steps.length - 1 && (
+              <div className="w-0.5 flex-1 my-1" style={{ background: step.done ? "var(--success)" : "var(--border)", opacity: step.done ? 0.4 : 1, minHeight: "20px" }} />
+            )}
           </div>
           <div className="pb-4 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium" style={{ color: step.done ? "var(--text-primary)" : "var(--text-secondary)", fontFamily: "var(--font-body)" }}>{step.label}</span>
-              {step.badge && <StatusBadge status={step.badge} />}
+              <span className="text-sm font-medium" style={{ color: step.done ? "var(--text-primary)" : "var(--text-secondary)", fontFamily: "var(--font-body)" }}>
+                {step.label}
+              </span>
+              {(step as any).badge && <StatusBadge status={(step as any).badge} />}
             </div>
-            <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+            <p className="text-xs mt-0.5" style={{ color: (step as any).blocked ? "var(--error)" : "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
               {step.detail}
               {(step as any).txSig && (
-                <a href={`https://explorer.solana.com/tx/${(step as any).txSig}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1" style={{ color: "var(--accent)" }}>
+                <a
+                  href={`https://explorer.solana.com/tx/${(step as any).txSig}?cluster=devnet`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="ml-2 inline-flex items-center gap-1"
+                  style={{ color: "var(--info)" }}
+                >
                   <ExternalLink size={10} /> Solana Explorer
                 </a>
               )}
             </p>
+            {/* Fiat confirmation action — only shown when awaiting */}
+            {(step as any).awaitingConfirm && (
+              <div className="mt-3 p-3 rounded-lg space-y-2" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)" }}>
+                <p className="text-[11px] font-medium" style={{ color: "var(--warning, #FBBF24)" }}>
+                  Awaiting your confirmation — confirm once the bank wire has landed in your account.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={confirmRef}
+                    onChange={(e) => setConfirmRef(e.target.value)}
+                    placeholder="Bank confirmation ref (optional)"
+                    className="flex-1 px-2 py-1.5 rounded text-xs outline-none"
+                    style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}
+                  />
+                  <button
+                    onClick={handleConfirmFiat}
+                    disabled={confirming}
+                    className="px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 disabled:opacity-50"
+                    style={{ background: "var(--success)", color: "#000" }}
+                  >
+                    {confirming ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                    Confirm Receipt
+                  </button>
+                </div>
+                {confirmError && (
+                  <p className="text-[10px]" style={{ color: "var(--error)" }}>{confirmError}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -102,11 +333,29 @@ export default function RedeemPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
+    network: "solana-devnet",
     stablecoinSymbol: "USDX",
     amount: "",
     sourceWallet: inst.walletAddress,
-    destinationBankAccount: "IBAN: GB29NWBK60161331926819",
+    // Fiat settlement details
+    destinationBankAccount: "GB29NWBK60161331926819",
+    beneficiaryBank: "NatWest",
+    bankSwiftBic: "NWBKGB2L",
+    accountHolderName: inst.name,
+    // Off-chain bank transfer linkage
+    paymentRails: "SWIFT",
+    transferReference: "",
   });
+
+  // Settlement window is issuer-defined, not user-selectable
+  const SETTLEMENT_WINDOW = "T+1";
+
+  const set = (key: string) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+  async function reloadRequests() {
+    const reqsRes = await fetch("/api/redeem-request");
+    setRequests(await reqsRes.json());
+  }
 
   useEffect(() => {
     async function load() {
@@ -130,19 +379,38 @@ export default function RedeemPage() {
       const res = await fetch("/api/redeem-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stablecoinSymbol: form.stablecoinSymbol, amount: parseFloat(form.amount), sourceWallet: form.sourceWallet, destinationBankAccount: form.destinationBankAccount }),
+        body: JSON.stringify({
+          stablecoinSymbol: form.stablecoinSymbol,
+          amount: parseFloat(form.amount),
+          sourceWallet: form.sourceWallet,
+          destinationBankAccount: form.destinationBankAccount,
+          network: form.network,
+          settlementDetails: {
+            beneficiaryBank: form.beneficiaryBank,
+            bankSwiftBic: form.bankSwiftBic,
+            accountHolderName: form.accountHolderName,
+            expectedSettlement: SETTLEMENT_WINDOW,
+            iban: form.destinationBankAccount,
+            paymentRails: form.paymentRails,
+            transferReference: form.transferReference || undefined,
+          },
+        }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error); }
-      else {
+      if (!res.ok) {
+        setError(data.error);
+      } else {
         setResult(data);
         const reqsRes = await fetch("/api/redeem-request");
         setRequests(await reqsRes.json());
         if (data.redeemRequest?.id) setExpandedId(data.redeemRequest.id);
         setForm((f) => ({ ...f, amount: "" }));
       }
-    } catch (err: any) { setError(err.message); }
-    finally { setSubmitting(false); }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -161,62 +429,134 @@ export default function RedeemPage() {
           <Card>
             <SectionHeader title="New Redeem Request" subtitle="Burn tokens · settle fiat" />
             <form onSubmit={handleSubmit} className="space-y-4">
+
+              {/* Network */}
+              <SelectField label="Network" value={form.network} onChange={set("network")}>
+                {NETWORKS.map((n) => (
+                  <option key={n.id} value={n.id} disabled={n.disabled}>
+                    {n.label}{n.disabled ? " — Coming Soon" : ""}
+                  </option>
+                ))}
+              </SelectField>
+
               {/* Stablecoin */}
-              <div>
-                <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>Stablecoin</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {stablecoins.map((coin) => (
-                    <button key={coin.symbol} type="button" onClick={() => setForm((f) => ({ ...f, stablecoinSymbol: coin.symbol }))}
-                      className="py-2 px-3 rounded-lg text-sm font-medium transition-all"
-                      style={{ background: form.stablecoinSymbol === coin.symbol ? "rgba(56,189,248,0.1)" : "var(--bg-elevated)", border: `1px solid ${form.stablecoinSymbol === coin.symbol ? "var(--info)" : "var(--border)"}`, color: form.stablecoinSymbol === coin.symbol ? "var(--info)" : "var(--text-secondary)", fontFamily: "var(--font-mono)" }}
-                    >{coin.symbol}</button>
-                  ))}
-                </div>
-              </div>
+              <SelectField label="Stablecoin" value={form.stablecoinSymbol} onChange={set("stablecoinSymbol")}>
+                {loading ? (
+                  <option>Loading…</option>
+                ) : (
+                  stablecoins.map((coin) => (
+                    <option key={coin.symbol} value={coin.symbol}>
+                      {coin.symbol} — {coin.name}
+                    </option>
+                  ))
+                )}
+              </SelectField>
 
               {/* Amount */}
-              <div>
-                <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>Amount (USD)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>$</span>
-                  <input type="number" min="1" max="10000000" required value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                    placeholder="50,000.00" className="w-full py-2.5 pl-6 pr-3 rounded-lg text-sm outline-none transition-all"
-                    style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}
-                    onFocus={(e) => (e.target.style.borderColor = "var(--info)")}
-                    onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-                  />
-                </div>
-              </div>
+              <InputField
+                label="Amount (USD)"
+                value={form.amount}
+                onChange={set("amount")}
+                placeholder="50,000.00"
+                prefix="$"
+                required
+              />
 
               {/* Source wallet */}
-              <div>
-                <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>Source Wallet</label>
-                <input type="text" required value={form.sourceWallet} onChange={(e) => setForm((f) => ({ ...f, sourceWallet: e.target.value }))}
-                  className="w-full py-2.5 px-3 rounded-lg text-sm outline-none transition-all"
-                  style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)", fontSize: "11px" }}
-                  onFocus={(e) => (e.target.style.borderColor = "var(--info)")}
-                  onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+              <InputField
+                label="Source Wallet"
+                value={form.sourceWallet}
+                onChange={set("sourceWallet")}
+                placeholder="Solana wallet address"
+                required
+                fontSize="11px"
+              />
+
+              {/* ── Fiat settlement section ── */}
+              <SectionDivider icon={Building2} label="Fiat Settlement Details" />
+
+              <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.06)", border: "1px solid rgba(56,189,248,0.2)" }}>
+                <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
+                <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                  Fiat will be wired to the account below after tokens are confirmed burned on-chain. Bank details are encrypted in travel rule filing.
+                </p>
+              </div>
+
+              <InputField
+                label="IBAN / Account Number"
+                value={form.destinationBankAccount}
+                onChange={set("destinationBankAccount")}
+                placeholder="GB29 NWBK 6016 1331 9268 19"
+                icon={Building2}
+                hint="Masked in Travel Rule filing per privacy requirements"
+                fontSize="11px"
+              />
+
+              <InputField
+                label="Account Holder Name"
+                value={form.accountHolderName}
+                onChange={set("accountHolderName")}
+                placeholder="Beneficiary legal name"
+                fontSize="12px"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <InputField
+                  label="Beneficiary Bank"
+                  value={form.beneficiaryBank}
+                  onChange={set("beneficiaryBank")}
+                  placeholder="e.g. NatWest"
+                />
+                <InputField
+                  label="SWIFT / BIC"
+                  value={form.bankSwiftBic}
+                  onChange={set("bankSwiftBic")}
+                  placeholder="e.g. NWBKGB2L"
                 />
               </div>
 
-              {/* Destination bank */}
+              {/* ── Off-chain transfer linkage ── */}
+              <SectionDivider icon={Banknote} label="Off-chain Transfer Linkage" />
+
+              <SelectField label="Payment Rails" value={form.paymentRails} onChange={set("paymentRails")}>
+                {["SWIFT", "SEPA", "CHAPS", "ACH", "FPS", "IMPS", "RTGS"].map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </SelectField>
+
+              <InputField
+                label="Transfer Reference (optional)"
+                value={form.transferReference}
+                onChange={set("transferReference")}
+                placeholder="e.g. INV-2024-00142 or UTR"
+                hint="Your internal reference to match this on-chain request to the outgoing bank wire. Included in Travel Rule filing."
+                fontSize="12px"
+              />
+
               <div>
                 <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                  Destination Bank Account
+                  Expected Settlement
                 </label>
-                <div className="relative">
-                  <Building2 size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-tertiary)" }} />
-                  <input type="text" value={form.destinationBankAccount} onChange={(e) => setForm((f) => ({ ...f, destinationBankAccount: e.target.value }))}
-                    placeholder="IBAN or account number"
-                    className="w-full py-2.5 pl-8 pr-3 rounded-lg text-sm outline-none transition-all"
-                    style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)", fontSize: "11px" }}
-                    onFocus={(e) => (e.target.style.borderColor = "var(--info)")}
-                    onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-                  />
+                <div
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg"
+                  style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
+                >
+                  <span style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)", fontSize: "13px" }}>
+                    {SETTLEMENT_WINDOW} — Next Business Day
+                  </span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded"
+                    style={{ background: "var(--bg-hover)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", border: "1px solid var(--border)" }}
+                  >
+                    Issuer SLA
+                  </span>
                 </div>
-                <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>Masked in Travel Rule filing per privacy requirements</p>
+                <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>
+                  Settlement window is defined by the issuer. Contact your account manager to discuss expedited settlement.
+                </p>
               </div>
 
+              {/* Compliance notice */}
               <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.06)", border: "1px solid rgba(56,189,248,0.2)" }}>
                 <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
                 <div>
@@ -227,7 +567,9 @@ export default function RedeemPage() {
                 </div>
               </div>
 
-              <button type="submit" disabled={submitting || !form.amount}
+              <button
+                type="submit"
+                disabled={submitting || !form.amount}
                 className="w-full py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 style={{ background: "var(--info)", color: "#000", fontFamily: "var(--font-display)" }}
               >
@@ -255,7 +597,7 @@ export default function RedeemPage() {
                 <div>
                   <p className="text-sm font-semibold" style={{ color: "var(--success)", fontFamily: "var(--font-display)" }}>Redeem Successful</p>
                   <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                    Tokens locked · Fiat settlement initiated · Travel Rule filed
+                    Tokens locked · Fiat settlement initiated ({SETTLEMENT_WINDOW}) · Travel Rule filed
                   </p>
                 </div>
               </div>
@@ -278,52 +620,95 @@ export default function RedeemPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Asset</th><th>Amount</th><th>Source Wallet</th><th>Status</th><th>Tx</th><th>Time</th><th></th>
+                      <th>Asset</th><th>Amount</th><th>Source Wallet</th><th>Settlement Bank</th><th>Status</th><th>Tx</th><th>Time</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {requests.map((r) => (
-                      <>
-                        <tr key={r.id} className="cursor-pointer" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)} style={{ background: expandedId === r.id ? "var(--bg-hover)" : undefined }}>
-                          <td><span className="px-2 py-0.5 rounded text-xs" style={{ background: "var(--info-dim)", color: "var(--info)", fontFamily: "var(--font-mono)" }}>{r.stablecoin?.symbol}</span></td>
-                          <td style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{fmt(r.amount)}</td>
-                          <td style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-secondary)" }}>{truncate(r.sourceWallet, 10)}</td>
-                          <td><StatusBadge status={r.status} /></td>
-                          <td>
-                            {r.txSignature ? (
-                              <span className="text-xs" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{truncate(r.txSignature, 6)}</span>
-                            ) : <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>—</span>}
-                          </td>
-                          <td style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>{formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}</td>
-                          <td>{expandedId === r.id ? <ChevronUp size={14} style={{ color: "var(--text-tertiary)" }} /> : <ChevronDown size={14} style={{ color: "var(--text-tertiary)" }} />}</td>
-                        </tr>
-                        {expandedId === r.id && (
-                          <tr key={`${r.id}-detail`}>
-                            <td colSpan={7} style={{ background: "var(--bg-elevated)", padding: "20px 16px" }}>
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {requests.map((r) => {
+                      const settlement = r.travelRuleData?.settlementDetails ?? {};
+                      return (
+                        <React.Fragment key={r.id}>
+                          <tr
+                            className="cursor-pointer"
+                            onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                            style={{ background: expandedId === r.id ? "var(--bg-hover)" : undefined }}
+                          >
+                            <td><span className="px-2 py-0.5 rounded text-xs" style={{ background: "var(--info-dim)", color: "var(--info)", fontFamily: "var(--font-mono)" }}>{r.stablecoin?.symbol}</span></td>
+                            <td style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{fmt(r.amount)}</td>
+                            <td style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-secondary)" }}>{truncate(r.sourceWallet, 10)}</td>
+                            <td style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                              {settlement.beneficiaryBank ? (
                                 <div>
-                                  <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>Redemption Flow</h4>
-                                  <RedeemFlow request={r} />
+                                  <span>{settlement.beneficiaryBank}</span>
+                                  <span className="mx-1 opacity-40">·</span>
+                                  <span style={{ color: "var(--info)" }}>{settlement.paymentRails ?? "SWIFT"}</span>
+                                  {settlement.transferReference && (
+                                    <><span className="mx-1 opacity-40">·</span><span title="Transfer Reference">{settlement.transferReference}</span></>
+                                  )}
                                 </div>
-                                <div>
-                                  <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>Travel Rule Data</h4>
-                                  {r.travelRuleData ? (
-                                    <div className="rounded-lg p-3 space-y-1.5 text-xs" style={{ background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "var(--font-mono)" }}>
-                                      {Object.entries(r.travelRuleData).filter(([k]) => !["timestamp"].includes(k)).map(([k, v]) => (
-                                        <div key={k} className="flex gap-2">
-                                          <span style={{ color: "var(--text-tertiary)", minWidth: "170px", flexShrink: 0 }}>{k}</span>
-                                          <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>No travel rule data</p>}
-                                </div>
-                              </div>
+                              ) : <span>—</span>}
                             </td>
+                            <td><StatusBadge status={r.status} /></td>
+                            <td>
+                              {r.txSignature
+                                ? <span className="text-xs" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{truncate(r.txSignature, 6)}</span>
+                                : <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>—</span>}
+                            </td>
+                            <td style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>{formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}</td>
+                            <td>{expandedId === r.id ? <ChevronUp size={14} style={{ color: "var(--text-tertiary)" }} /> : <ChevronDown size={14} style={{ color: "var(--text-tertiary)" }} />}</td>
                           </tr>
-                        )}
-                      </>
-                    ))}
+                          {expandedId === r.id && (
+                            <tr key={`${r.id}-detail`}>
+                              <td colSpan={8} style={{ background: "var(--bg-elevated)", padding: "20px 16px" }}>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                  <div>
+                                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                                      Redemption Flow
+                                    </h4>
+                                    <RedeemFlow request={r} onFiatConfirmed={reloadRequests} />
+                                  </div>
+                                  <div className="space-y-4">
+                                    {/* Settlement details */}
+                                    {r.travelRuleData?.settlementDetails && (
+                                      <div>
+                                        <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                                          Fiat Settlement Details
+                                        </h4>
+                                        <div className="rounded-lg p-3 space-y-1.5 text-xs" style={{ background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "var(--font-mono)" }}>
+                                          {Object.entries(r.travelRuleData.settlementDetails).map(([k, v]) => (
+                                            <div key={k} className="flex gap-2">
+                                              <span style={{ color: "var(--text-tertiary)", minWidth: "160px", flexShrink: 0 }}>{k}</span>
+                                              <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                                        Travel Rule Data
+                                      </h4>
+                                      {r.travelRuleData ? (
+                                        <div className="rounded-lg p-3 space-y-1.5 text-xs" style={{ background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "var(--font-mono)" }}>
+                                          {Object.entries(r.travelRuleData)
+                                            .filter(([k]) => !["timestamp", "settlementDetails"].includes(k))
+                                            .map(([k, v]) => (
+                                              <div key={k} className="flex gap-2">
+                                                <span style={{ color: "var(--text-tertiary)", minWidth: "170px", flexShrink: 0 }}>{k}</span>
+                                                <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      ) : <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>No travel rule data</p>}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

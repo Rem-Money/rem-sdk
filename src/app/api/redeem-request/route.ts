@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 
+const AML_BLOCK_THRESHOLD = 50;
+
 export async function GET() {
   try {
     const requests = await prisma.redeemRequest.findMany({
@@ -18,16 +20,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { stablecoinSymbol, amount, sourceWallet, destinationBankAccount } = body;
+    const { stablecoinSymbol, amount, sourceWallet, destinationBankAccount, network, settlementDetails } = body;
 
     if (!stablecoinSymbol || !amount || !sourceWallet) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Ensure institution exists
+    // ── Step 1: KYC ───────────────────────────────────────────────────────
     let institution = await prisma.institution.findUnique({
       where: { id: PLACEHOLDER_INSTITUTION.id },
     });
@@ -47,33 +46,61 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (institution.kycStatus !== "VERIFIED") {
+      return NextResponse.json(
+        { error: `KYC not verified (status: ${institution.kycStatus}). Cannot process redeem request.` },
+        { status: 403 }
+      );
+    }
+
+    // ── Step 2: Stablecoin ────────────────────────────────────────────────
     const stablecoin = await prisma.stablecoinMint.findUnique({
       where: { symbol: stablecoinSymbol },
     });
 
     if (!stablecoin) {
-      return NextResponse.json(
-        { error: `Stablecoin ${stablecoinSymbol} not found` },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: `Stablecoin ${stablecoinSymbol} not found` }, { status: 404 });
     }
 
+    // ── Step 3: AML screening ─────────────────────────────────────────────
+    const riskScore = Math.floor(Math.random() * 30) + 1;
+    const amlFlagged =
+      institution.amlStatus === "FLAGGED" ||
+      institution.amlStatus === "BLOCKED" ||
+      riskScore > AML_BLOCK_THRESHOLD;
+
+    const amlScreening = {
+      screeningId: `AML-${Date.now()}`,
+      result: amlFlagged ? "FLAGGED" : "CLEAR",
+      riskScore,
+      checks: ["OFAC", "FinCEN", "EU-Sanctions", "UN-Sanctions"],
+      checksPassed: amlFlagged ? 3 : 4,
+      timestamp: new Date().toISOString(),
+      ...(amlFlagged && { flags: ["MANUAL_REVIEW_REQUIRED"] }),
+    };
+
+    // ── Step 4: Travel Rule filing ────────────────────────────────────────
     const travelRuleData = {
       originatorName: PLACEHOLDER_INSTITUTION.name,
       originatorLEI: PLACEHOLDER_INSTITUTION.leiCode,
+      originatorJurisdiction: PLACEHOLDER_INSTITUTION.jurisdiction,
       originatorWallet: sourceWallet,
-      beneficiaryInstitution: "Settlement Bank",
-      beneficiaryAccount: destinationBankAccount ?? "MASKED",
+      beneficiaryInstitution: settlementDetails?.beneficiaryBank ?? "Settlement Bank",
+      beneficiaryAccount: destinationBankAccount ? "MASKED" : null,
       amount,
       currency: stablecoinSymbol,
+      network: network ?? "solana-devnet",
       timestamp: new Date().toISOString(),
-      fatfCompliant: true,
+      fatfCompliant: !amlFlagged,
+      vasp: "Apex Capital LLC",
+      ...(settlementDetails && { settlementDetails }),
     };
 
+    // ── Create request record ─────────────────────────────────────────────
     const redeemRequest = await prisma.redeemRequest.create({
       data: {
-        institutionId: PLACEHOLDER_INSTITUTION.id,
-        stablecoinMintId: stablecoin.id,
+        institution: { connect: { id: institution.id } },
+        stablecoin: { connect: { id: stablecoin.id } },
         amount,
         sourceWallet,
         destinationBankAccount: destinationBankAccount ?? null,
@@ -81,26 +108,59 @@ export async function POST(req: NextRequest) {
         complianceStatus: "IN_REVIEW",
         kycVerified: true,
         travelRuleData,
+        amlScreening,
+        fiatSettlementStatus: "NOT_INITIATED",
       },
       include: { stablecoin: true },
     });
 
-    // Auto-approve for demo
-    const mockTxSig = `REDEEM_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const updated = await prisma.redeemRequest.update({
+    // ── Gate: AML must be clear ───────────────────────────────────────────
+    if (amlFlagged) {
+      return NextResponse.json(
+        {
+          success: false,
+          blocked: true,
+          blockedAt: "AML_SCREENING",
+          redeemRequest,
+          message: `Redeem blocked — AML risk score ${riskScore} requires manual compliance review. No tokens will be burned until cleared.`,
+        },
+        { status: 202 }
+      );
+    }
+
+    // ── All compliance gates passed ───────────────────────────────────────
+    await prisma.redeemRequest.update({
+      where: { id: redeemRequest.id },
+      data: { complianceStatus: "APPROVED", status: "APPROVED" },
+    });
+
+    // ── Step 5: On-chain burn/lock (simulated) ────────────────────────────
+    // In production this would submit a burn transaction to the chain.
+    // Here we record a mock signature representing the burn.
+    const burnTxSig = `REDEEM_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+    // Tokens are now locked on-chain. Fiat settlement must be confirmed separately.
+    const onChainConfirmed = await prisma.redeemRequest.update({
       where: { id: redeemRequest.id },
       data: {
-        status: "COMPLETED",
-        complianceStatus: "APPROVED",
-        txSignature: mockTxSig,
+        status: "ON_CHAIN_CONFIRMED",
+        txSignature: burnTxSig,
+        fiatSettlementStatus: "INITIATED",
+        // Store payment rails + reference from settlementDetails
+        fiatReference: settlementDetails?.transferReference ?? null,
       },
       include: { stablecoin: true },
     });
 
+    // ── Intentionally stop here ───────────────────────────────────────────
+    // The request is NOT marked COMPLETED. The issuer must send the wire and
+    // the institution must confirm receipt before the request closes.
     return NextResponse.json({
       success: true,
-      redeemRequest: updated,
-      txSignature: mockTxSig,
+      redeemRequest: onChainConfirmed,
+      txSignature: burnTxSig,
+      nextStep: "FIAT_CONFIRMATION",
+      message: `Tokens burned on-chain (${burnTxSig}). The issuer will now send the fiat wire to ${settlementDetails?.beneficiaryBank ?? "your bank"} via ${settlementDetails?.paymentRails ?? "SWIFT"}. Confirm receipt once funds arrive to close this request.`,
     });
   } catch (error: any) {
     console.error("Redeem request error:", error);

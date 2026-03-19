@@ -59,20 +59,25 @@ model MintRequest {
 }
 
 model RedeemRequest {
-  id                    String           @id @default(cuid())
+  id                    String               @id @default(cuid())
   institutionId         String
   stablecoinMintId      String
   amount                Float
   sourceWallet          String
   destinationBankAccount String?
-  status                RequestStatus    @default(PENDING)
+  status                RequestStatus        @default(PENDING)
   txSignature           String?
   txError               String?
-  complianceStatus      ComplianceStatus @default(PENDING)
-  kycVerified           Boolean          @default(false)
+  complianceStatus      ComplianceStatus     @default(PENDING)
+  kycVerified           Boolean              @default(false)
   travelRuleData        Json?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  amlScreening          Json?
+  // Fiat settlement tracking — separate from on-chain status
+  fiatSettlementStatus  FiatSettlementStatus @default(NOT_INITIATED)
+  fiatReference         String?              // wire/payment reference from the bank
+  fiatConfirmedAt       DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
   institution  Institution    @relation(fields: [institutionId], references: [id])
   stablecoin   StablecoinMint @relation(fields: [stablecoinMintId], references: [id])
@@ -120,9 +125,19 @@ enum RequestStatus {
   COMPLIANCE_REVIEW
   APPROVED
   PROCESSING
+  ON_CHAIN_CONFIRMED  // tokens minted/burned on-chain; awaiting fiat leg
+  FIAT_INITIATED      // issuer has sent the wire instruction
   COMPLETED
   REJECTED
   FAILED
+}
+
+enum FiatSettlementStatus {
+  NOT_INITIATED   // on-chain step not yet done
+  INITIATED       // tokens burned; issuer must send wire
+  WIRE_SENT       // issuer has sent the wire (self-reported)
+  CONFIRMED       // beneficiary confirmed funds received
+  FAILED          // wire failed or rejected by bank
 }
 
 enum ComplianceStatus {

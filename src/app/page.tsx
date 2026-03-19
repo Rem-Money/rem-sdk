@@ -41,9 +41,18 @@ function truncate(s: string, len = 8) {
   return s.length > len * 2 + 3 ? `${s.slice(0, len)}…${s.slice(-4)}` : s;
 }
 
+const COIN_COLORS = [
+  { bg: "var(--accent-subtle)", text: "var(--accent)", border: "var(--accent-glow)" },
+  { bg: "var(--info-dim)",      text: "var(--info)",   border: "rgba(56,189,248,0.2)" },
+  { bg: "var(--success-dim)",   text: "var(--success)", border: "rgba(16,185,129,0.2)" },
+  { bg: "var(--warning-dim,rgba(251,191,36,0.1))", text: "var(--warning,#FBBF24)", border: "rgba(251,191,36,0.2)" },
+  { bg: "rgba(168,85,247,0.1)", text: "#A855F7",       border: "rgba(168,85,247,0.2)" },
+];
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedCoin, setSelectedCoin] = useState<string>("");
 
   useEffect(() => {
     async function load() {
@@ -51,6 +60,7 @@ export default function DashboardPage() {
         const res = await fetch("/api/dashboard");
         const json = await res.json();
         setData(json);
+        if (json.stablecoins?.length) setSelectedCoin(json.stablecoins[0].id);
       } catch {
         // handle error
       } finally {
@@ -312,73 +322,154 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Stablecoin info cards */}
+      {/* Stablecoin explorer */}
       <div className="animate-fade-in stagger-6">
         <Card>
-          <SectionHeader title="Supported Stablecoins" subtitle="Devnet mint addresses" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+            <SectionHeader title="Asset Explorer" subtitle="Select a stablecoin to inspect its on-chain details" />
+            {/* Dropdown */}
             {loading ? (
-              [...Array(3)].map((_, i) => (
-                <div key={i} className="h-24 skeleton rounded-lg" />
-              ))
-            ) : data?.stablecoins?.map((coin, i) => (
+              <div className="h-9 w-48 skeleton rounded-lg" />
+            ) : (
+              <div className="relative">
+                <select
+                  value={selectedCoin}
+                  onChange={(e) => setSelectedCoin(e.target.value)}
+                  className="appearance-none pr-8 pl-3 py-2 text-sm rounded-lg cursor-pointer"
+                  style={{
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-bright)",
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-mono)",
+                    outline: "none",
+                    minWidth: "180px",
+                  }}
+                >
+                  {data?.stablecoins?.map((coin) => (
+                    <option key={coin.id} value={coin.id}>
+                      {coin.symbol} — {coin.name}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px]"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
+                  ▾
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Detail panel */}
+          {loading ? (
+            <div className="h-40 skeleton rounded-lg" />
+          ) : (() => {
+            const coins = data?.stablecoins ?? [];
+            const coinIdx = coins.findIndex((c: any) => c.id === selectedCoin);
+            const coin = coins[coinIdx];
+            if (!coin) return (
+              <div className="text-center py-10" style={{ color: "var(--text-tertiary)" }}>
+                <Coins size={24} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No stablecoins found. Seed the database first.</p>
+              </div>
+            );
+            const palette = COIN_COLORS[coinIdx % COIN_COLORS.length];
+            return (
               <div
-                key={coin.id}
-                className="p-4 rounded-lg"
+                className="rounded-lg p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5"
                 style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
               >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                      style={{
-                        background: i === 0 ? "var(--accent-subtle)" : i === 1 ? "var(--info-dim)" : "var(--success-dim)",
-                        color: i === 0 ? "var(--accent)" : i === 1 ? "var(--info)" : "var(--success)",
-                        fontFamily: "var(--font-display)",
-                        border: `1px solid ${i === 0 ? "var(--accent-glow)" : i === 1 ? "rgba(56,189,248,0.2)" : "rgba(16,185,129,0.2)"}`,
-                      }}
-                    >
-                      {coin.symbol[0]}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
+                {/* Identity */}
+                <div className="flex items-center gap-3 lg:col-span-3 pb-4" style={{ borderBottom: "1px solid var(--border)" }}>
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                    style={{ background: palette.bg, color: palette.text, border: `1px solid ${palette.border}`, fontFamily: "var(--font-display)" }}
+                  >
+                    {coin.symbol[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-base font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
                         {coin.symbol}
-                      </div>
-                      <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>{coin.name}</div>
+                      </span>
+                      <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{coin.name}</span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded"
+                        style={{ background: "var(--success-dim)", color: "var(--success)", fontFamily: "var(--font-mono)" }}
+                      >
+                        Active
+                      </span>
                     </div>
                   </div>
-                  <span
-                    className="text-[10px] px-1.5 py-0.5 rounded"
-                    style={{ background: "var(--success-dim)", color: "var(--success)", fontFamily: "var(--font-mono)" }}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Coins size={12} style={{ color: palette.text }} />
+                    <span className="text-xs" style={{ color: palette.text, fontFamily: "var(--font-mono)" }}>
+                      {coin.network ?? "Solana Devnet"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mint address */}
+                <div className="lg:col-span-3">
+                  <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                    On-chain Mint Address
+                  </p>
+                  <div
+                    className="flex items-center justify-between gap-2 px-3 py-2 rounded"
+                    style={{ background: "var(--bg-base)", border: "1px solid var(--border)" }}
                   >
-                    Active
-                  </span>
+                    <span className="text-xs font-mono break-all" style={{ color: "var(--text-secondary)" }}>
+                      {coin.mintAddress ?? "—"}
+                    </span>
+                    {coin.mintAddress && (
+                      <a
+                        href={`https://explorer.solana.com/address/${coin.mintAddress}?cluster=devnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0"
+                        title="View on Solana Explorer"
+                      >
+                        <ExternalLink size={12} style={{ color: "var(--text-tertiary)" }} />
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <div
-                  className="text-[10px] font-mono px-2 py-1.5 rounded flex items-center justify-between"
-                  style={{ background: "var(--bg-base)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }}
-                >
-                  <span>{truncate(coin.mintAddress, 10)}</span>
-                  <a
-                    href={`https://explorer.solana.com/address/${coin.mintAddress}?cluster=devnet`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <ExternalLink size={10} style={{ color: "var(--text-tertiary)" }} />
-                  </a>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-[10px]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                    Decimals: {coin.decimals}
-                  </span>
-                  <span className="text-[10px]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                    {coin.network}
-                  </span>
-                </div>
+
+                {/* Stats */}
+                {[
+                  { label: "Total Minted", value: fmt(coin.totalMinted ?? 0), color: "var(--accent)" },
+                  { label: "Total Redeemed", value: fmt(coin.totalRedeemed ?? 0), color: "var(--info)" },
+                  { label: "Net Circulating", value: fmt(coin.netCirculating ?? 0), color: "var(--success)" },
+                ].map(({ label, value, color }) => (
+                  <div key={label}>
+                    <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                      {label}
+                    </p>
+                    <p className="text-lg font-semibold" style={{ color, fontFamily: "var(--font-display)" }}>
+                      {value}
+                    </p>
+                  </div>
+                ))}
+
+                {/* Meta */}
+                {[
+                  { label: "Decimals", value: coin.decimals ?? "—" },
+                  { label: "Network", value: coin.network ?? "Solana Devnet" },
+                  { label: "Status", value: coin.active ? "Active" : "Inactive" },
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                      {label}
+                    </p>
+                    <p className="text-sm" style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
+                      {String(value)}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </Card>
       </div>
     </div>
