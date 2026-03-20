@@ -66,7 +66,7 @@ export async function seed() {
 
   // ── Stablecoins ──────────────────────────────────────────────────────────
   const coinDefs = [
-    { symbol: "USDX", name: "USD Extended", mintAddress: process.env.MOCK_USDX_OPERATOR_PUBLIC_KEY ?? "GyQMwcby9mcvjZoxJpFuoiDQyhVTdAjdiYMX2worFi4e", decimals: 6 },
+    { symbol: "USX", name: "USD Extended", mintAddress: process.env.MOCK_USX_OPERATOR_PUBLIC_KEY ?? "GyQMwcby9mcvjZoxJpFuoiDQyhVTdAjdiYMX2worFi4e", decimals: 6 },
     { symbol: "USDC", name: "USD Coin", mintAddress: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", decimals: 6 },
     { symbol: "EURC", name: "Euro Coin", mintAddress: "HzwqbKZw8HxMN6bF2yFZNrht3c2iXXzpKcFu7uBEDKtr", decimals: 6 },
   ];
@@ -87,10 +87,10 @@ export async function seed() {
   // In-progress / failed records have the correct step frozen at its blocking state.
 
   const mintSeeds: Parameters<typeof prisma.mintRequest.create>[0]["data"][] = [
-    // ✅ COMPLETED — USDX, 14 days ago
+    // ✅ COMPLETED — USX, 14 days ago
     {
       institution: { connect: { id: institution.id } },
-      stablecoin: { connect: { id: coins.USDX } },
+      stablecoin: { connect: { id: coins.USX } },
       amount: 500_000,
       destinationWallet: PLACEHOLDER_INSTITUTION.walletAddress,
       status: "COMPLETED",
@@ -110,10 +110,10 @@ export async function seed() {
       updatedAt: daysAgo(14),
     },
 
-    // ✅ COMPLETED — USDX, 10 days ago
+    // ✅ COMPLETED — USX, 10 days ago
     {
       institution: { connect: { id: institution.id } },
-      stablecoin: { connect: { id: coins.USDX } },
+      stablecoin: { connect: { id: coins.USX } },
       amount: 1_250_000,
       destinationWallet: PLACEHOLDER_INSTITUTION.walletAddress,
       status: "COMPLETED",
@@ -210,7 +210,7 @@ export async function seed() {
     // KYC ✅  |  AML ⏳  |  Travel Rule ⏳  |  On-chain ⏳
     {
       institution: { connect: { id: institution.id } },
-      stablecoin: { connect: { id: coins.USDX } },
+      stablecoin: { connect: { id: coins.USX } },
       amount: 2_000_000,
       destinationWallet: PLACEHOLDER_INSTITUTION.walletAddress,
       status: "PENDING",
@@ -287,9 +287,9 @@ export async function seed() {
   };
 
   const redeemSeeds: RedeemSeed[] = [
-    // ✅ COMPLETED — USDX CHAPS, all 7 steps done
+    // ✅ COMPLETED — USX CHAPS, all 7 steps done
     {
-      stablecoinId: coins.USDX,
+      stablecoinId: coins.USX,
       amount: 200_000,
       sourceWallet: PLACEHOLDER_INSTITUTION.walletAddress,
       destinationBankAccount: "GB29NWBK60161331926819",
@@ -380,7 +380,7 @@ export async function seed() {
     // KYC ✅  |  AML ✅  |  Travel Rule ✅  |  On-chain ✅  |  Wire initiated ✅  |  Fiat confirmed ⏳
     // This row drives the "Confirm Receipt" button in the UI
     {
-      stablecoinId: coins.USDX,
+      stablecoinId: coins.USX,
       amount: 900_000,
       sourceWallet: PLACEHOLDER_INSTITUTION.walletAddress,
       destinationBankAccount: "GB29NWBK60161331926819",
@@ -513,7 +513,7 @@ export async function seed() {
       recordType: "TRAVEL_RULE",
       status: "PENDING",
       riskScore: 20,
-      notes: "Awaiting counterparty VASP response for $900k USDX redeem. IVMS101 payload sent to NatWest VASP.",
+      notes: "Awaiting counterparty VASP response for $900k USX redeem. IVMS101 payload sent to NatWest VASP.",
       jurisdiction: "GB",
       fatfStatus: "PENDING",
       ofacScreening: "CLEAR",

@@ -7,10 +7,10 @@ import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 // This is the final gate before a redeem request is marked COMPLETED.
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const { bankConfirmationRef, confirmedBy } = body as {
       bankConfirmationRef?: string;

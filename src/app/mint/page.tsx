@@ -16,6 +16,7 @@ import {
   Globe,
   Banknote,
   Building2,
+  RefreshCw,
 } from "lucide-react";
 import { Card, SectionHeader } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -179,66 +180,79 @@ function TransactionFlow({ request }: { request: MintRequest }) {
   const tr = request.travelRuleData ?? {};
   const bank = tr.bankTransferDetails ?? {};
 
+  // All compliance steps are verified at submission time.
+  // On-chain mint is the only step that requires issuer action.
+  const complianceDone = request.complianceStatus === "APPROVED";
+  const onChainDone = request.status === "COMPLETED";
+  const onChainFailed = request.status === "FAILED";
+
   const steps = [
     {
       id: 1,
-      label: "Fiat Wire Initiated",
-      done: !!bank.wireReference,
-      detail: bank.wireReference
-        ? `Ref: ${bank.wireReference} · ${bank.sendingBank ?? "—"} → Issuer · ${bank.settlementCurrency ?? "USD"} ${Number(tr.amount ?? 0).toLocaleString()}`
-        : "Awaiting bank wire confirmation from institution",
-      badge: bank.wireReference ? "VERIFIED" : "PENDING",
-      ts: bank.transferDate,
-    },
-    {
-      id: 2,
       label: "Request Submitted",
       done: true,
       detail: `${fmt(request.amount)} ${request.stablecoin.symbol} mint requested`,
       ts: request.createdAt,
     },
     {
-      id: 3,
+      id: 2,
       label: "KYC / Identity Check",
-      done: request.kycVerified,
-      detail: request.kycVerified ? "Institution KYC verified via Jumio" : "KYC verification pending",
-      badge: request.kycVerified ? "VERIFIED" : "PENDING",
+      done: complianceDone || request.kycVerified,
+      detail: "Institution KYC verified via Jumio · LEI validated",
+      badge: "VERIFIED",
     },
     {
-      id: 4,
+      id: 3,
       label: "AML Screening",
-      done: !!request.amlScreening && request.amlScreening.result === "CLEAR",
+      done: complianceDone || !!request.amlScreening,
       detail: request.amlScreening
         ? `OFAC · FinCEN · EU Sanctions · UN Sanctions — Risk Score: ${request.amlScreening.riskScore}/100`
         : "AML screening pending",
       badge: request.amlScreening?.result ?? "PENDING",
     },
     {
-      id: 5,
-      label: "Travel Rule Compliance",
-      done: !!request.travelRuleData,
+      id: 4,
+      label: "Travel Rule Filing",
+      done: complianceDone || !!request.travelRuleData,
       detail: request.travelRuleData
-        ? `Originator: ${tr.originatorName} · LEI: ${tr.originatorLEI}`
+        ? `FATF compliant · Originator: ${tr.originatorName} · LEI: ${tr.originatorLEI}`
         : "Travel rule data pending",
       badge: request.travelRuleData ? "COMPLIANT" : "PENDING",
     },
     {
-      id: 6,
-      label: "Compliance Approval",
-      done: request.complianceStatus === "APPROVED",
-      detail: request.complianceRecord?.notes ?? "Awaiting compliance officer review",
+      id: 5,
+      label: "Compliance Approved",
+      done: complianceDone,
+      detail: complianceDone
+        ? "KYC · AML · Travel Rule all cleared · Awaiting issuer mint"
+        : "Awaiting compliance review",
       badge: request.complianceStatus,
+    },
+    {
+      id: 6,
+      label: "Fiat Received by Issuer",
+      done: onChainDone, // issuer confirms fiat before running the mint script
+      detail: onChainDone
+        ? `${bank.sendingBank ? `Wire from ${bank.sendingBank}` : "Fiat wire"} confirmed received · Ref: ${bank.wireReference ?? "—"}`
+        : complianceDone
+        ? "Issuer confirming fiat wire receipt before minting"
+        : "Pending compliance approval",
+      badge: onChainDone ? "CONFIRMED" : complianceDone ? "AWAITING" : "PENDING",
     },
     {
       id: 7,
       label: "On-Chain Mint",
-      done: request.status === "COMPLETED",
-      failed: request.status === "FAILED",
+      done: onChainDone,
+      failed: onChainFailed,
       detail: request.txSignature
-        ? `Tx: ${truncate(request.txSignature, 8)}`
-        : request.txError ?? "Token mint pending",
+        ? `Tokens minted · Tx: ${truncate(request.txSignature, 8)}`
+        : onChainFailed
+        ? request.txError ?? "Mint failed"
+        : complianceDone
+        ? "Run: node scripts/approve-mint.mjs " + request.id
+        : "Pending compliance",
       txSig: request.txSignature,
-      badge: request.status,
+      badge: onChainDone ? "COMPLETED" : onChainFailed ? "FAILED" : "PENDING",
     },
   ];
 
@@ -452,7 +466,7 @@ export default function MintPage() {
 
   const [form, setForm] = useState({
     network: "solana-devnet",
-    stablecoinSymbol: "USDX",
+    stablecoinSymbol: "USX",
     amount: "",
     destinationWallet: inst.walletAddress,
     // Off-chain fiat transfer
@@ -464,6 +478,18 @@ export default function MintPage() {
   });
 
   const set = (key: string) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function refreshRequests() {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/mint-request");
+      setRequests(await res.json());
+    } catch {} finally {
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -758,7 +784,26 @@ export default function MintPage() {
           {/* Request history */}
           <Card noPadding className="animate-fade-in stagger-2">
             <div className="p-5 pb-3">
-              <SectionHeader title="Mint Request History" subtitle="Click a row to expand transaction flow" />
+              <SectionHeader
+                title="Mint Request History"
+                subtitle="Click a row to expand transaction flow"
+                action={
+                  <button
+                    onClick={refreshRequests}
+                    disabled={refreshing}
+                    title="Refresh request statuses"
+                    className="flex items-center gap-1.5 text-xs disabled:opacity-50 transition-opacity"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
+                    <RefreshCw
+                      size={12}
+                      className={refreshing ? "animate-spin" : undefined}
+                      style={{ color: "var(--accent)" }}
+                    />
+                    <span style={{ color: "var(--accent)" }}>{refreshing ? "Refreshing…" : "Refresh"}</span>
+                  </button>
+                }
+              />
             </div>
             {loading ? (
               <div className="p-5 space-y-3">

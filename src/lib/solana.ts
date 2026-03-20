@@ -21,12 +21,12 @@ export function getConnection(): Connection {
 }
 
 export function getMintAuthorityKeypair(): Keypair {
-  const key = process.env.MOCK_USDX_MINT_AUTHORITY_KEY!;
+  const key = process.env.MOCK_USX_MINT_AUTHORITY_KEY!;
   const decoded = bs58.decode(key);
   return Keypair.fromSecretKey(decoded);
 }
 
-export async function getOrCreateUsdxMint(): Promise<PublicKey> {
+export async function getOrCreateUsxMint(): Promise<PublicKey> {
   // The operator public key is the mint authority's public key
   // We derive the mint from the authority deterministically
   const mintAuthority = getMintAuthorityKeypair();

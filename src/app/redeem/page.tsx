@@ -334,7 +334,7 @@ export default function RedeemPage() {
 
   const [form, setForm] = useState({
     network: "solana-devnet",
-    stablecoinSymbol: "USDX",
+    stablecoinSymbol: "USX",
     amount: "",
     sourceWallet: inst.walletAddress,
     // Fiat settlement details
