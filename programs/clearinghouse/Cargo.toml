@@ -1,0 +1,19 @@
+[package]
+name = "clearinghouse"
+version = "0.1.0"
+description = "REM Clearinghouse — on-chain netting and settlement (Phase 2)"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "clearinghouse"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.30.1"
