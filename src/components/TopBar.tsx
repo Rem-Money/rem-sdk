@@ -1,12 +1,14 @@
 "use client";
 
-import { Building2, ShieldCheck, ChevronDown, Wallet2, PlugZap } from "lucide-react";
+import { Building2, ShieldCheck, ChevronDown, Wallet2, PlugZap, LogOut } from "lucide-react";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 import { usePhantomWallet } from "@/components/PhantomWalletProvider";
+import { useMockAuth } from "@/components/MockAuthProvider";
 
 export function TopBar() {
   const inst = PLACEHOLDER_INSTITUTION;
   const wallet = usePhantomWallet();
+  const auth = useMockAuth();
 
   const walletButtonLabel =
     wallet.status === "connecting"
@@ -30,6 +32,7 @@ export function TopBar() {
 
       {/* Right - entity chip */}
       <div className="flex items-center gap-3">
+
         <button
           onClick={() => {
             if (wallet.connected) {
@@ -131,6 +134,21 @@ export function TopBar() {
             DEMO
           </span>
           <ChevronDown size={12} style={{ color: "var(--text-tertiary)" }} />
+        </button>
+        <button
+          type="button"
+          onClick={auth.signOut}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors"
+          style={{
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          <LogOut size={13} />
+          <span style={{ fontFamily: "var(--font-body)", fontWeight: 500 }}>
+            Sign Out
+          </span>
         </button>
       </div>
     </header>
