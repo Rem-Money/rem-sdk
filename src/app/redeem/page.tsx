@@ -53,9 +53,9 @@ function truncate(s: string, len = 12) {
 }
 
 function SelectField({
-  label, value, onChange, children, accentFocus = "info",
+  label, value, onChange, children, accentFocus = "info", disabled = false,
 }: {
-  label: string; value: string; onChange: (v: string) => void; children: React.ReactNode; accentFocus?: string;
+  label: string; value: string; onChange: (v: string) => void; children: React.ReactNode; accentFocus?: string; disabled?: boolean;
 }) {
   return (
     <div>
@@ -65,8 +65,9 @@ function SelectField({
       <div className="relative">
         <select
           value={value}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full py-3 px-3.5 pr-9 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all"
+          className="w-full py-3 px-3.5 pr-9 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             background: "linear-gradient(180deg, rgba(17,21,32,0.96) 0%, rgba(11,15,24,0.96) 100%)",
             border: "1px solid var(--border-bright)",
@@ -92,11 +93,11 @@ function SelectField({
 }
 
 function InputField({
-  label, value, onChange, placeholder, prefix, icon: Icon, required = false, hint, type = "text", fontSize, accentFocus = "info",
+  label, value, onChange, placeholder, prefix, icon: Icon, required = false, hint, type = "text", fontSize, accentFocus = "info", disabled = false,
 }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string;
   prefix?: string; icon?: React.ElementType; required?: boolean; hint?: string;
-  type?: string; fontSize?: string; accentFocus?: string;
+  type?: string; fontSize?: string; accentFocus?: string; disabled?: boolean;
 }) {
   return (
     <div>
@@ -109,10 +110,11 @@ function InputField({
         <input
           type={type}
           required={required}
+          disabled={disabled}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full py-3 rounded-xl text-sm outline-none transition-all placeholder:text-[#64748b]"
+          className="w-full py-3 rounded-xl text-sm outline-none transition-all placeholder:text-[#64748b] disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             paddingLeft: (prefix || Icon) ? "1.95rem" : "0.9rem",
             paddingRight: "0.9rem",
@@ -207,8 +209,8 @@ function RedeemFlow({
       detail: request.complianceStatus === "APPROVED"
         ? `Risk score within threshold · OFAC / FinCEN / EU-Sanctions clear`
         : request.complianceStatus === "IN_REVIEW"
-        ? "Under manual review — burn cannot proceed until cleared"
-        : "Pending",
+          ? "Under manual review — burn cannot proceed until cleared"
+          : "Pending",
       badge: request.complianceStatus,
       blocked: request.complianceStatus === "IN_REVIEW",
     },
@@ -239,8 +241,8 @@ function RedeemFlow({
       detail: fiatDone
         ? `Funds received · ${request.fiatReference ? `Bank ref: ${request.fiatReference}` : "Settlement confirmed"}`
         : awaitingFiatConfirm
-        ? "Confirm once funds arrive in your account"
-        : "Awaiting wire initiation",
+          ? "Confirm once funds arrive in your account"
+          : "Awaiting wire initiation",
       awaitingConfirm: awaitingFiatConfirm,
     },
   ];
@@ -256,16 +258,16 @@ function RedeemFlow({
                 background: step.done
                   ? "var(--success-dim)"
                   : step.blocked
-                  ? "rgba(244,63,94,0.12)"
-                  : "var(--bg-elevated)",
+                    ? "rgba(244,63,94,0.12)"
+                    : "var(--bg-elevated)",
                 border: `2px solid ${step.done ? "var(--success)" : step.blocked ? "var(--error)" : "var(--border-bright)"}`,
               }}
             >
               {step.done
                 ? <CheckCircle2 size={12} style={{ color: "var(--success)" }} />
                 : step.blocked
-                ? <XCircle size={12} style={{ color: "var(--error)" }} />
-                : <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{step.id}</span>
+                  ? <XCircle size={12} style={{ color: "var(--error)" }} />
+                  : <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{step.id}</span>
               }
             </div>
             {idx < steps.length - 1 && (
@@ -339,6 +341,8 @@ export default function RedeemPage() {
   const [result, setResult] = useState<RedeemSubmissionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   const [form, setForm] = useState({
     network: "solana-devnet",
@@ -357,6 +361,12 @@ export default function RedeemPage() {
 
   // Settlement window is issuer-defined, not user-selectable
   const SETTLEMENT_WINDOW = "T+1";
+  const selectedCoin = stablecoins.find((coin) => coin.symbol === form.stablecoinSymbol);
+  const requestedAmount = Number.parseFloat(form.amount);
+  const hasRequestedAmount = Number.isFinite(requestedAmount) && requestedAmount > 0;
+  const walletDisconnected = !wallet.connected;
+  const lowBalance = wallet.connected && walletBalance !== null && hasRequestedAmount && requestedAmount > walletBalance;
+  const redeemFormDisabled = walletDisconnected || submitting;
 
   const set = (key: string) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -389,8 +399,41 @@ export default function RedeemPage() {
     });
   }, [inst.walletAddress, wallet.address]);
 
+  useEffect(() => {
+    const mintAddress = selectedCoin?.mintAddress;
+    if (!wallet.connected || !wallet.address || !mintAddress) {
+      setWalletBalance(null);
+      setBalanceLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadWalletBalance() {
+      setBalanceLoading(true);
+      try {
+        const res = await fetch(
+          `/api/token-balance?wallet=${encodeURIComponent(wallet.address ?? "")}&mint=${encodeURIComponent(mintAddress ?? "")}`
+        );
+        const data = (await res.json()) as { balance?: number };
+        if (!cancelled) {
+          setWalletBalance(typeof data.balance === "number" ? data.balance : 0);
+        }
+      } catch {
+        if (!cancelled) setWalletBalance(null);
+      } finally {
+        if (!cancelled) setBalanceLoading(false);
+      }
+    }
+
+    loadWalletBalance();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCoin?.mintAddress, wallet.address, wallet.connected]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (walletDisconnected || lowBalance) return;
     setSubmitting(true);
     setResult(null);
     setError(null);
@@ -455,196 +498,253 @@ export default function RedeemPage() {
           >
             <SectionHeader title="New Redeem Request" subtitle="Burn tokens · settle fiat" />
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div
-                className="grid grid-cols-2 gap-2 rounded-xl p-3"
-                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
-              >
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                    Redemption flow
-                  </p>
-                  <p className="text-sm mt-1 font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
-                    Burn first, settle fiat after
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                    Settlement
-                  </p>
-                  <p className="text-sm mt-1 font-semibold" style={{ color: "var(--info)", fontFamily: "var(--font-display)" }}>
-                    T+1 issuer SLA
-                  </p>
-                </div>
-              </div>
-
-              <div
-                className="space-y-4 rounded-xl p-4"
-                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
-              >
-
-              {/* Network */}
-              <SelectField label="Network" value={form.network} onChange={set("network")}>
-                {NETWORKS.map((n) => (
-                  <option key={n.id} value={n.id} disabled={n.disabled}>
-                    {n.label}{n.disabled ? " — Coming Soon" : ""}
-                  </option>
-                ))}
-              </SelectField>
-
-              {/* Stablecoin */}
-              <SelectField label="Stablecoin" value={form.stablecoinSymbol} onChange={set("stablecoinSymbol")}>
-                {loading ? (
-                  <option>Loading…</option>
-                ) : (
-                  stablecoins.map((coin) => (
-                    <option key={coin.symbol} value={coin.symbol}>
-                      {coin.symbol} — {coin.name}
-                    </option>
-                  ))
-                )}
-              </SelectField>
-
-              {/* Amount */}
-              <InputField
-                label="Amount (USD)"
-                value={form.amount}
-                onChange={set("amount")}
-                placeholder="50,000.00"
-                prefix="$"
-                required
-              />
-
-              {/* Source wallet */}
-              <InputField
-                label="Source Wallet"
-                value={form.sourceWallet}
-                onChange={set("sourceWallet")}
-                placeholder={wallet.connected ? "Connected Phantom wallet" : "Solana wallet address"}
-                required
-                fontSize="11px"
-                hint={
-                  wallet.connected && wallet.shortAddress
-                    ? `Connected Phantom: ${wallet.shortAddress}`
-                    : "Use the wallet that currently holds the tokens you want to redeem."
-                }
-              />
-              </div>
-
-              {/* ── Fiat settlement section ── */}
-              <SectionDivider icon={Building2} label="Fiat Settlement Details" />
-
-              <div
-                className="space-y-4 rounded-xl p-4"
-                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
-              >
-
-              <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.28)" }}>
-                <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
-                <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  Fiat will be wired to the account below after tokens are confirmed burned on-chain. Bank details are encrypted in travel rule filing.
-                </p>
-              </div>
-
-              <InputField
-                label="IBAN / Account Number"
-                value={form.destinationBankAccount}
-                onChange={set("destinationBankAccount")}
-                placeholder="GB29 NWBK 6016 1331 9268 19"
-                icon={Building2}
-                hint="Masked in Travel Rule filing per privacy requirements"
-                fontSize="11px"
-              />
-
-              <InputField
-                label="Account Holder Name"
-                value={form.accountHolderName}
-                onChange={set("accountHolderName")}
-                placeholder="Beneficiary legal name"
-                fontSize="12px"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <InputField
-                  label="Beneficiary Bank"
-                  value={form.beneficiaryBank}
-                  onChange={set("beneficiaryBank")}
-                  placeholder="e.g. NatWest"
-                />
-                <InputField
-                  label="SWIFT / BIC"
-                  value={form.bankSwiftBic}
-                  onChange={set("bankSwiftBic")}
-                  placeholder="e.g. NWBKGB2L"
-                />
-              </div>
-              </div>
-
-              {/* ── Off-chain transfer linkage ── */}
-              <SectionDivider icon={Banknote} label="Off-chain Transfer Linkage" />
-
-              <div
-                className="space-y-4 rounded-xl p-4"
-                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
-              >
-
-              <SelectField label="Payment Rails" value={form.paymentRails} onChange={set("paymentRails")}>
-                {["SWIFT", "SEPA", "CHAPS", "ACH", "FPS", "IMPS", "RTGS"].map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </SelectField>
-
-              <InputField
-                label="Transfer Reference (optional)"
-                value={form.transferReference}
-                onChange={set("transferReference")}
-                placeholder="e.g. INV-2024-00142 or UTR"
-                hint="Your internal reference to match this on-chain request to the outgoing bank wire. Included in Travel Rule filing."
-                fontSize="12px"
-              />
-
-              <div>
-                <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                  Expected Settlement
-                </label>
+              {walletDisconnected && (
                 <div
-                  className="flex items-center justify-between px-3 py-2.5 rounded-lg"
-                  style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
+                  className="p-3 rounded-lg flex gap-2.5"
+                  style={{ background: "rgba(120,137,171,0.08)", border: "1px solid rgba(148,163,184,0.28)" }}
                 >
-                  <span style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)", fontSize: "13px" }}>
-                    {SETTLEMENT_WINDOW} — Next Business Day
-                  </span>
-                  <span
-                    className="text-[10px] px-1.5 py-0.5 rounded"
-                    style={{ background: "var(--bg-hover)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", border: "1px solid var(--border)" }}
-                  >
-                    Issuer SLA
-                  </span>
+                  <Info size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0, marginTop: "1px" }} />
+                  <div>
+                    <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>Wallet connection required</p>
+                    <p className="text-[12px] mt-0.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Connect Phantom to unlock redeem requests.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>
-                  Settlement window is defined by the issuer. Contact your account manager to discuss expedited settlement.
-                </p>
-              </div>
-              </div>
-
-              {/* Compliance notice */}
-              <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.28)" }}>
-                <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
-                <div>
-                  <p className="text-xs font-medium" style={{ color: "var(--info)" }}>Travel Rule Filing</p>
-                  <p className="text-[12px] mt-0.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                    FATF Travel Rule data will be automatically filed. Bank details are encrypted in transit.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting || !form.amount}
-                className="w-full py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                style={{ background: "var(--info)", color: "#000", fontFamily: "var(--font-display)" }}
+              )}
+              <div
+                className="space-y-4"
+                style={{
+                  opacity: walletDisconnected ? 0.5 : 1,
+                  filter: walletDisconnected ? "grayscale(0.25)" : undefined,
+                  transition: "opacity 0.2s ease, filter 0.2s ease",
+                }}
               >
-                {submitting ? <><Loader2 size={15} className="animate-spin" />Processing…</> : <><ArrowDownCircle size={15} />Submit Redeem Request</>}
-              </button>
+                <div
+                  className="grid grid-cols-2 gap-2 rounded-xl p-3"
+                  style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+                >
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                      Redemption flow
+                    </p>
+                    <p className="text-sm mt-1 font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
+                      Burn first, settle fiat after
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                      Settlement
+                    </p>
+                    <p className="text-sm mt-1 font-semibold" style={{ color: "var(--info)", fontFamily: "var(--font-display)" }}>
+                      T+1 issuer SLA
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="space-y-4 rounded-xl p-4"
+                  style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+                >
+
+                  {/* Network */}
+                  <SelectField label="Network" value={form.network} onChange={set("network")} disabled={redeemFormDisabled}>
+                    {NETWORKS.map((n) => (
+                      <option key={n.id} value={n.id} disabled={n.disabled}>
+                        {n.label}{n.disabled ? " — Coming Soon" : ""}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  {/* Stablecoin */}
+                  <SelectField label="Stablecoin" value={form.stablecoinSymbol} onChange={set("stablecoinSymbol")} disabled={redeemFormDisabled}>
+                    {loading ? (
+                      <option>Loading…</option>
+                    ) : (
+                      stablecoins.map((coin) => (
+                        <option key={coin.symbol} value={coin.symbol}>
+                          {coin.symbol} — {coin.name}
+                        </option>
+                      ))
+                    )}
+                  </SelectField>
+
+                  {/* Amount */}
+                  <InputField
+                    label="Amount (USD)"
+                    value={form.amount}
+                    onChange={set("amount")}
+                    placeholder="50,000.00"
+                    prefix="$"
+                    required
+                    disabled={redeemFormDisabled}
+                  />
+                  {wallet.connected && (
+                    <div className="space-y-1">
+                      <p className="text-[10px]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                        {balanceLoading
+                          ? `Checking ${form.stablecoinSymbol} wallet balance...`
+                          : walletBalance === null
+                            ? "Wallet balance unavailable"
+                            : `Available balance: ${walletBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${form.stablecoinSymbol}`}
+                      </p>
+                      {lowBalance && (
+                        <div
+                          className="p-2.5 rounded-lg flex gap-2"
+                          style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.28)" }}
+                        >
+                          <XCircle size={12} style={{ color: "var(--warning)", flexShrink: 0, marginTop: "2px" }} />
+                          <p className="text-[11px] leading-relaxed" style={{ color: "var(--warning)" }}>
+                            Low balance. Your connected wallet holds {walletBalance?.toLocaleString(undefined, { maximumFractionDigits: 6 })} {form.stablecoinSymbol}, which is below the requested redeem amount.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Source wallet */}
+                  <InputField
+                    label="Source Wallet"
+                    value={form.sourceWallet}
+                    onChange={set("sourceWallet")}
+                    placeholder={wallet.connected ? "Connected Phantom wallet" : "Solana wallet address"}
+                    required
+                    fontSize="11px"
+                    disabled={redeemFormDisabled}
+                    hint={
+                      wallet.connected && wallet.shortAddress
+                        ? `Connected Phantom: ${wallet.shortAddress}`
+                        : "Use the wallet that currently holds the tokens you want to redeem."
+                    }
+                  />
+                </div>
+
+                {/* ── Fiat settlement section ── */}
+                <SectionDivider icon={Building2} label="Fiat Settlement Details" />
+
+                <div
+                  className="space-y-4 rounded-xl p-4"
+                  style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+                >
+
+                  <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.28)" }}>
+                    <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
+                    <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Fiat will be wired to the account below after tokens are confirmed burned on-chain. Bank details are encrypted in travel rule filing.
+                    </p>
+                  </div>
+
+                  <InputField
+                    label="IBAN / Account Number"
+                    value={form.destinationBankAccount}
+                    onChange={set("destinationBankAccount")}
+                    placeholder="GB29 NWBK 6016 1331 9268 19"
+                    icon={Building2}
+                    hint="Masked in Travel Rule filing per privacy requirements"
+                    fontSize="11px"
+                    disabled={redeemFormDisabled}
+                  />
+
+                  <InputField
+                    label="Account Holder Name"
+                    value={form.accountHolderName}
+                    onChange={set("accountHolderName")}
+                    placeholder="Beneficiary legal name"
+                    fontSize="12px"
+                    disabled={redeemFormDisabled}
+                  />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <InputField
+                      label="Beneficiary Bank"
+                      value={form.beneficiaryBank}
+                      onChange={set("beneficiaryBank")}
+                      placeholder="e.g. NatWest"
+                      disabled={redeemFormDisabled}
+                    />
+                    <InputField
+                      label="SWIFT / BIC"
+                      value={form.bankSwiftBic}
+                      onChange={set("bankSwiftBic")}
+                      placeholder="e.g. NWBKGB2L"
+                      disabled={redeemFormDisabled}
+                    />
+                  </div>
+                </div>
+
+                {/* ── Off-chain transfer linkage ── */}
+                <SectionDivider icon={Banknote} label="Off-chain Transfer Linkage" />
+
+                <div
+                  className="space-y-4 rounded-xl p-4"
+                  style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+                >
+
+                  <SelectField label="Payment Rails" value={form.paymentRails} onChange={set("paymentRails")} disabled={redeemFormDisabled}>
+                    {["SWIFT", "SEPA", "CHAPS", "ACH", "FPS", "IMPS", "RTGS"].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </SelectField>
+
+                  <InputField
+                    label="Transfer Reference (optional)"
+                    value={form.transferReference}
+                    onChange={set("transferReference")}
+                    placeholder="e.g. INV-2024-00142 or UTR"
+                    hint="Your internal reference to match this on-chain request to the outgoing bank wire. Included in Travel Rule filing."
+                    fontSize="12px"
+                    disabled={redeemFormDisabled}
+                  />
+
+                  <div>
+                    <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                      Expected Settlement
+                    </label>
+                    <div
+                      className="flex items-center justify-between px-3 py-2.5 rounded-lg"
+                      style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
+                    >
+                      <span style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)", fontSize: "13px" }}>
+                        {SETTLEMENT_WINDOW} — Next Business Day
+                      </span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded"
+                        style={{ background: "var(--bg-hover)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", border: "1px solid var(--border)" }}
+                      >
+                        Issuer SLA
+                      </span>
+                    </div>
+                    <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>
+                      Settlement window is defined by the issuer. Contact your account manager to discuss expedited settlement.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Compliance notice */}
+                <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.28)" }}>
+                  <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
+                  <div>
+                    <p className="text-xs font-medium" style={{ color: "var(--info)" }}>Travel Rule Filing</p>
+                    <p className="text-[12px] mt-0.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      FATF Travel Rule data will be automatically filed. Bank details are encrypted in transit.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={redeemFormDisabled || !form.amount || lowBalance}
+                  className="w-full py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  style={{
+                    background: redeemFormDisabled || lowBalance ? "rgba(120,137,171,0.22)" : "var(--info)",
+                    color: redeemFormDisabled || lowBalance ? "var(--text-tertiary)" : "#000",
+                    fontFamily: "var(--font-display)",
+                    cursor: redeemFormDisabled || lowBalance ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {submitting ? <><Loader2 size={15} className="animate-spin" />Processing…</> : <><ArrowDownCircle size={15} />Submit Redeem Request</>}
+                </button>
+              </div>
             </form>
           </Card>
         </div>
