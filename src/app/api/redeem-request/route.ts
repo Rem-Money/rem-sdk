@@ -1,8 +1,19 @@
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getErrorMessage } from "@/lib/demo-types";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 
 const AML_BLOCK_THRESHOLD = 50;
+
+type RedeemRequestBody = {
+  stablecoinSymbol?: string;
+  amount?: number;
+  sourceWallet?: string;
+  destinationBankAccount?: string;
+  network?: string;
+  settlementDetails?: Prisma.InputJsonObject;
+};
 
 export async function GET() {
   try {
@@ -12,14 +23,14 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(requests);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as RedeemRequestBody;
     const { stablecoinSymbol, amount, sourceWallet, destinationBankAccount, network, settlementDetails } = body;
 
     if (!stablecoinSymbol || !amount || !sourceWallet) {
@@ -79,13 +90,26 @@ export async function POST(req: NextRequest) {
       ...(amlFlagged && { flags: ["MANUAL_REVIEW_REQUIRED"] }),
     };
 
+    const beneficiaryBank =
+      typeof settlementDetails?.beneficiaryBank === "string"
+        ? settlementDetails.beneficiaryBank
+        : "Settlement Bank";
+    const paymentRails =
+      typeof settlementDetails?.paymentRails === "string"
+        ? settlementDetails.paymentRails
+        : "SWIFT";
+    const transferReference =
+      typeof settlementDetails?.transferReference === "string"
+        ? settlementDetails.transferReference
+        : null;
+
     // ── Step 4: Travel Rule filing ────────────────────────────────────────
-    const travelRuleData = {
+    const travelRuleData: Prisma.InputJsonObject = {
       originatorName: PLACEHOLDER_INSTITUTION.name,
       originatorLEI: PLACEHOLDER_INSTITUTION.leiCode,
       originatorJurisdiction: PLACEHOLDER_INSTITUTION.jurisdiction,
       originatorWallet: sourceWallet,
-      beneficiaryInstitution: settlementDetails?.beneficiaryBank ?? "Settlement Bank",
+      beneficiaryInstitution: beneficiaryBank,
       beneficiaryAccount: destinationBankAccount ? "MASKED" : null,
       amount,
       currency: stablecoinSymbol,
@@ -93,7 +117,7 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
       fatfCompliant: !amlFlagged,
       vasp: "Apex Capital LLC",
-      ...(settlementDetails && { settlementDetails }),
+      ...(settlementDetails ? { settlementDetails } : {}),
     };
 
     // ── Create request record ─────────────────────────────────────────────
@@ -147,7 +171,7 @@ export async function POST(req: NextRequest) {
         txSignature: burnTxSig,
         fiatSettlementStatus: "INITIATED",
         // Store payment rails + reference from settlementDetails
-        fiatReference: settlementDetails?.transferReference ?? null,
+        fiatReference: transferReference,
       },
       include: { stablecoin: true },
     });
@@ -160,10 +184,10 @@ export async function POST(req: NextRequest) {
       redeemRequest: onChainConfirmed,
       txSignature: burnTxSig,
       nextStep: "FIAT_CONFIRMATION",
-      message: `Tokens burned on-chain (${burnTxSig}). The issuer will now send the fiat wire to ${settlementDetails?.beneficiaryBank ?? "your bank"} via ${settlementDetails?.paymentRails ?? "SWIFT"}. Confirm receipt once funds arrive to close this request.`,
+      message: `Tokens burned on-chain (${burnTxSig}). The issuer will now send the fiat wire to ${beneficiaryBank} via ${paymentRails}. Confirm receipt once funds arrive to close this request.`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Redeem request error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

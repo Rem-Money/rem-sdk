@@ -1,5 +1,5 @@
 // Run once to seed initial data: POST /api/seed
-import { Prisma } from "@prisma/client";
+import { Prisma, type ComplianceStatus, type FiatSettlementStatus, type RequestStatus } from "@prisma/client";
 import { prisma } from "./db";
 import { PLACEHOLDER_INSTITUTION } from "./placeholder-entity";
 
@@ -273,14 +273,14 @@ export async function seed() {
     amount: number;
     sourceWallet: string;
     destinationBankAccount?: string;
-    status: string;
-    complianceStatus: string;
+    status: RequestStatus;
+    complianceStatus: ComplianceStatus;
     kycVerified: boolean;
     txSignature?: string;
     txError?: string;
     amlScreening: Prisma.InputJsonValue;
     travelRuleData: Prisma.InputJsonValue | typeof Prisma.JsonNull;
-    fiatSettlementStatus: string;
+    fiatSettlementStatus: FiatSettlementStatus;
     fiatReference?: string;
     fiatConfirmedAt?: Date;
     createdAt: Date;
@@ -440,15 +440,18 @@ export async function seed() {
     await prisma.redeemRequest.create({
       data: {
         ...r,
+        destinationBankAccount: r.destinationBankAccount ?? null,
         institution: { connect: { id: institution.id } },
         stablecoin: { connect: { id: stablecoinId } },
-      } as any,
+      },
     });
   }
   console.log(`Seeded ${redeemSeeds.length} redeem requests`);
 
   // ── Compliance Records ───────────────────────────────────────────────────
-  const complianceSeeds = [
+  type ComplianceSeed = Omit<Prisma.ComplianceRecordCreateInput, "institution">;
+
+  const complianceSeeds: ComplianceSeed[] = [
     {
       recordType: "KYC_REVIEW",
       status: "APPROVED",
@@ -525,7 +528,7 @@ export async function seed() {
 
   for (const c of complianceSeeds) {
     await prisma.complianceRecord.create({
-      data: { ...c, institution: { connect: { id: institution.id } } } as any,
+      data: { ...c, institution: { connect: { id: institution.id } } },
     });
   }
   console.log(`Seeded ${complianceSeeds.length} compliance records`);

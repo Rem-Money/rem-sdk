@@ -8,15 +8,19 @@ import {
   ExternalLink,
   Info,
   Loader2,
-  Copy,
   ChevronDown,
   ChevronUp,
   Building2,
-  Globe,
   Banknote,
 } from "lucide-react";
 import { Card, SectionHeader } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
+import {
+  RedeemRequestRecord,
+  RedeemSubmissionResponse,
+  StablecoinRecord,
+  getErrorMessage,
+} from "@/lib/demo-types";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 import { usePhantomWallet } from "@/components/PhantomWalletProvider";
 import { formatDistanceToNow } from "date-fns";
@@ -28,23 +32,15 @@ const NETWORKS = [
   { id: "polygon", label: "Polygon", disabled: true },
 ];
 
-interface RedeemRequest {
-  id: string;
-  amount: number;
-  sourceWallet: string;
-  destinationBankAccount?: string;
-  status: string;
-  complianceStatus: string;
-  txSignature?: string;
-  txError?: string;
-  kycVerified: boolean;
-  travelRuleData?: any;
-  amlScreening?: any;
-  fiatSettlementStatus: string;
-  fiatReference?: string;
-  fiatConfirmedAt?: string;
-  createdAt: string;
-  stablecoin: { symbol: string; name: string };
+interface RedeemFlowStep {
+  id: number;
+  label: string;
+  done: boolean;
+  detail: string;
+  badge?: string;
+  blocked?: boolean;
+  txSig?: string;
+  awaitingConfirm?: boolean;
 }
 
 function fmt(n: number) {
@@ -54,15 +50,6 @@ function fmt(n: number) {
 function truncate(s: string, len = 12) {
   if (!s) return "—";
   return s.length > len * 2 ? `${s.slice(0, len)}…${s.slice(-6)}` : s;
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="ml-1 opacity-50 hover:opacity-100">
-      <Copy size={11} style={{ color: copied ? "var(--success)" : "var(--text-tertiary)" }} />
-    </button>
-  );
 }
 
 function SelectField({
@@ -167,10 +154,10 @@ function RedeemFlow({
   request,
   onFiatConfirmed,
 }: {
-  request: RedeemRequest;
+  request: RedeemRequestRecord;
   onFiatConfirmed: () => void;
 }) {
-  const tr = (request.travelRuleData ?? {}) as any;
+  const tr = request.travelRuleData ?? {};
   const settlement = tr.settlementDetails ?? {};
   const [confirming, setConfirming] = useState(false);
   const [confirmRef, setConfirmRef] = useState("");
@@ -196,14 +183,14 @@ function RedeemFlow({
       } else {
         onFiatConfirmed();
       }
-    } catch (e: any) {
-      setConfirmError(e.message);
+    } catch (e: unknown) {
+      setConfirmError(getErrorMessage(e));
     } finally {
       setConfirming(false);
     }
   }
 
-  const steps = [
+  const steps: RedeemFlowStep[] = [
     {
       id: 1, label: "Redeem Request Submitted", done: true,
       detail: `${fmt(request.amount)} ${request.stablecoin.symbol} redemption requested`,
@@ -250,7 +237,7 @@ function RedeemFlow({
     {
       id: 7, label: "Fiat Receipt Confirmed", done: fiatDone,
       detail: fiatDone
-        ? `Funds received · ${(request as any).fiatReference ? `Bank ref: ${(request as any).fiatReference}` : "Settlement confirmed"}`
+        ? `Funds received · ${request.fiatReference ? `Bank ref: ${request.fiatReference}` : "Settlement confirmed"}`
         : awaitingFiatConfirm
         ? "Confirm once funds arrive in your account"
         : "Awaiting wire initiation",
@@ -268,15 +255,15 @@ function RedeemFlow({
               style={{
                 background: step.done
                   ? "var(--success-dim)"
-                  : (step as any).blocked
+                  : step.blocked
                   ? "rgba(244,63,94,0.12)"
                   : "var(--bg-elevated)",
-                border: `2px solid ${step.done ? "var(--success)" : (step as any).blocked ? "var(--error)" : "var(--border-bright)"}`,
+                border: `2px solid ${step.done ? "var(--success)" : step.blocked ? "var(--error)" : "var(--border-bright)"}`,
               }}
             >
               {step.done
                 ? <CheckCircle2 size={12} style={{ color: "var(--success)" }} />
-                : (step as any).blocked
+                : step.blocked
                 ? <XCircle size={12} style={{ color: "var(--error)" }} />
                 : <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{step.id}</span>
               }
@@ -290,13 +277,13 @@ function RedeemFlow({
               <span className="text-sm font-medium" style={{ color: step.done ? "var(--text-primary)" : "var(--text-secondary)", fontFamily: "var(--font-body)" }}>
                 {step.label}
               </span>
-              {(step as any).badge && <StatusBadge status={(step as any).badge} />}
+              {step.badge && <StatusBadge status={step.badge} />}
             </div>
-            <p className="text-xs mt-0.5" style={{ color: (step as any).blocked ? "var(--error)" : "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+            <p className="text-xs mt-0.5" style={{ color: step.blocked ? "var(--error)" : "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
               {step.detail}
-              {(step as any).txSig && (
+              {step.txSig && (
                 <a
-                  href={`https://explorer.solana.com/tx/${(step as any).txSig}?cluster=devnet`}
+                  href={`https://explorer.solana.com/tx/${step.txSig}?cluster=devnet`}
                   target="_blank" rel="noopener noreferrer"
                   className="ml-2 inline-flex items-center gap-1"
                   style={{ color: "var(--info)" }}
@@ -306,7 +293,7 @@ function RedeemFlow({
               )}
             </p>
             {/* Fiat confirmation action — only shown when awaiting */}
-            {(step as any).awaitingConfirm && (
+            {step.awaitingConfirm && (
               <div className="mt-3 p-3 rounded-lg space-y-2" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)" }}>
                 <p className="text-[11px] font-medium" style={{ color: "var(--warning, #FBBF24)" }}>
                   Awaiting your confirmation — confirm once the bank wire has landed in your account.
@@ -345,11 +332,11 @@ function RedeemFlow({
 export default function RedeemPage() {
   const inst = PLACEHOLDER_INSTITUTION;
   const wallet = usePhantomWallet();
-  const [stablecoins, setStablecoins] = useState<any[]>([]);
-  const [requests, setRequests] = useState<RedeemRequest[]>([]);
+  const [stablecoins, setStablecoins] = useState<StablecoinRecord[]>([]);
+  const [requests, setRequests] = useState<RedeemRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<RedeemSubmissionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -375,15 +362,15 @@ export default function RedeemPage() {
 
   async function reloadRequests() {
     const reqsRes = await fetch("/api/redeem-request");
-    setRequests(await reqsRes.json());
+    setRequests((await reqsRes.json()) as RedeemRequestRecord[]);
   }
 
   useEffect(() => {
     async function load() {
       try {
         const [coinsRes, reqsRes] = await Promise.all([fetch("/api/stablecoins"), fetch("/api/redeem-request")]);
-        setStablecoins(await coinsRes.json());
-        setRequests(await reqsRes.json());
+        setStablecoins((await coinsRes.json()) as StablecoinRecord[]);
+        setRequests((await reqsRes.json()) as RedeemRequestRecord[]);
       } finally {
         setLoading(false);
       }
@@ -428,18 +415,18 @@ export default function RedeemPage() {
           },
         }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as RedeemSubmissionResponse & { error?: string };
       if (!res.ok) {
-        setError(data.error);
+        setError(data.error ?? "Failed to submit redeem request");
       } else {
         setResult(data);
         const reqsRes = await fetch("/api/redeem-request");
-        setRequests(await reqsRes.json());
+        setRequests((await reqsRes.json()) as RedeemRequestRecord[]);
         if (data.redeemRequest?.id) setExpandedId(data.redeemRequest.id);
         setForm((f) => ({ ...f, amount: "" }));
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -722,11 +709,11 @@ export default function RedeemPage() {
                             <td style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
                               {settlement.beneficiaryBank ? (
                                 <div>
-                                  <span>{settlement.beneficiaryBank}</span>
+                                  <span>{String(settlement.beneficiaryBank)}</span>
                                   <span className="mx-1 opacity-40">·</span>
-                                  <span style={{ color: "var(--info)" }}>{settlement.paymentRails ?? "SWIFT"}</span>
+                                  <span style={{ color: "var(--info)" }}>{String(settlement.paymentRails ?? "SWIFT")}</span>
                                   {settlement.transferReference && (
-                                    <><span className="mx-1 opacity-40">·</span><span title="Transfer Reference">{settlement.transferReference}</span></>
+                                    <><span className="mx-1 opacity-40">·</span><span title="Transfer Reference">{String(settlement.transferReference)}</span></>
                                   )}
                                 </div>
                               ) : <span>—</span>}

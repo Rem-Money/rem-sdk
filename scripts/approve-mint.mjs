@@ -8,7 +8,6 @@
 // This simulates the issuer receiving the institution's fiat wire and
 // authorising the corresponding token mint on Solana devnet.
 
-import { createRequire } from "module";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -29,7 +28,7 @@ for (const file of [".env.local", ".env"]) {
 
 const { PrismaClient } = await import("@prisma/client");
 const { PrismaPg } = await import("@prisma/adapter-pg");
-const { Connection, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } = await import("@solana/web3.js");
+const { Connection, Keypair, PublicKey } = await import("@solana/web3.js");
 const { getOrCreateAssociatedTokenAccount, mintTo, getMint } = await import("@solana/spl-token");
 const bs58 = await import("bs58");
 
@@ -214,7 +213,11 @@ async function main() {
   let fail = 0;
   for (const req of requests) {
     const success = await approveRequest(req);
-    success ? ok++ : fail++;
+    if (success) {
+      ok++;
+    } else {
+      fail++;
+    }
   }
 
   console.log(`\n──────────────────────────────────────────`);

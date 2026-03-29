@@ -1,6 +1,17 @@
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getErrorMessage } from "@/lib/demo-types";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
+
+type MintRequestBody = {
+  stablecoinSymbol?: string;
+  amount?: number;
+  destinationWallet?: string;
+  travelRuleData?: Prisma.InputJsonObject;
+  bankTransferDetails?: Prisma.InputJsonObject;
+  network?: string;
+};
 
 export async function GET() {
   try {
@@ -10,14 +21,14 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(requests);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as MintRequestBody;
     const { stablecoinSymbol, amount, destinationWallet, travelRuleData, bankTransferDetails, network } = body;
 
     if (!stablecoinSymbol || !amount || !destinationWallet) {
@@ -80,7 +91,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Step 4: Travel Rule filing ────────────────────────────────────────
-    const travelRule = {
+    const travelRule: Prisma.InputJsonObject = {
       originatorName: PLACEHOLDER_INSTITUTION.name,
       originatorLEI: PLACEHOLDER_INSTITUTION.leiCode,
       originatorJurisdiction: PLACEHOLDER_INSTITUTION.jurisdiction,
@@ -93,8 +104,8 @@ export async function POST(req: NextRequest) {
       fatfCompliant: true,
       vasp: "Apex Capital LLC",
       vaspId: "APEX-001",
-      ...(bankTransferDetails && { bankTransferDetails }),
-      ...travelRuleData,
+      ...(bankTransferDetails ? { bankTransferDetails } : {}),
+      ...(travelRuleData ?? {}),
     };
 
     // ── Create request — all compliance steps already verified ────────────
@@ -145,8 +156,8 @@ export async function POST(req: NextRequest) {
       nextStep: "ISSUER_MINT",
       message: "All compliance checks passed. Request is APPROVED and queued for on-chain mint by the issuer.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Mint request error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

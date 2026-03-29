@@ -11,35 +11,12 @@ import {
   Eye,
   TrendingUp,
   Building2,
-  Flag,
 } from "lucide-react";
 import { Card, SectionHeader, StatCard } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ComplianceRecordRecord, ComplianceResponse } from "@/lib/demo-types";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 import { formatDistanceToNow, format } from "date-fns";
-
-interface ComplianceRecord {
-  id: string;
-  recordType: string;
-  status: string;
-  riskScore?: number;
-  jurisdiction?: string;
-  travelRuleData?: any;
-  kycData?: any;
-  amlData?: any;
-  fatfStatus?: string;
-  ofacScreening?: string;
-  notes?: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  createdAt: string;
-  mintRequest?: {
-    id: string;
-    amount: number;
-    status: string;
-    stablecoin: { symbol: string };
-  };
-}
 
 function riskColor(score?: number) {
   if (!score) return "var(--text-tertiary)";
@@ -79,16 +56,16 @@ function fmt(n: number) {
 
 export default function CompliancePage() {
   const inst = PLACEHOLDER_INSTITUTION;
-  const [data, setData] = useState<{ records: ComplianceRecord[]; institution: any } | null>(null);
+  const [data, setData] = useState<ComplianceResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<ComplianceRecord | null>(null);
+  const [selected, setSelected] = useState<ComplianceRecordRecord | null>(null);
   const [filter, setFilter] = useState<string>("ALL");
 
   useEffect(() => {
     async function load() {
       try {
         const res = await fetch("/api/compliance");
-        setData(await res.json());
+        setData((await res.json()) as ComplianceResponse);
       } finally {
         setLoading(false);
       }
@@ -322,7 +299,7 @@ export default function CompliancePage() {
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>KYC Data</p>
                   <div className="space-y-1 text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>
-                    {Object.entries(selected.kycData as any).map(([k, v]) => (
+                    {Object.entries(selected.kycData ?? {}).map(([k, v]) => (
                       <div key={k} className="flex gap-2">
                         <span style={{ color: "var(--text-tertiary)", minWidth: "80px", flexShrink: 0 }}>{k}</span>
                         <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
@@ -336,7 +313,7 @@ export default function CompliancePage() {
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>AML Screening</p>
                   <div className="space-y-1 text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>
-                    {Object.entries(selected.amlData as any)
+                    {Object.entries(selected.amlData ?? {})
                       .filter(([k]) => !["timestamp", "screeningId"].includes(k))
                       .map(([k, v]) => (
                         <div key={k} className="flex gap-2">

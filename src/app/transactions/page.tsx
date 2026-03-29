@@ -10,8 +10,9 @@ import {
   Copy,
   RefreshCw,
 } from "lucide-react";
-import { Card, SectionHeader } from "@/components/Card";
+import { Card } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
+import { MintRequestRecord, RedeemRequestRecord, TravelRuleData } from "@/lib/demo-types";
 import { formatDistanceToNow, format } from "date-fns";
 
 interface Transaction {
@@ -23,9 +24,9 @@ interface Transaction {
   complianceStatus: string;
   txSignature?: string;
   kycVerified: boolean;
-  travelRuleData?: any;
+  travelRuleData?: TravelRuleData;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   wallet: string;
 }
 
@@ -48,8 +49,8 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function TransactionsPage() {
-  const [mints, setMints] = useState<any[]>([]);
-  const [redeems, setRedeems] = useState<any[]>([]);
+  const [mints, setMints] = useState<MintRequestRecord[]>([]);
+  const [redeems, setRedeems] = useState<RedeemRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"ALL" | "MINT" | "REDEEM">("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");

@@ -2,7 +2,6 @@
 // Run directly: node scripts/seed.mjs
 // Does NOT require the Next.js dev server to be running.
 
-import { createRequire } from "module";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";

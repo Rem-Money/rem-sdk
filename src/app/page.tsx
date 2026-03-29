@@ -7,26 +7,13 @@ import {
   ArrowDownCircle,
   ShieldCheck,
   Activity,
-  TrendingUp,
   Coins,
-  Clock,
   ExternalLink,
 } from "lucide-react";
 import { Card, StatCard, SectionHeader } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DashboardData } from "@/lib/demo-types";
 import { formatDistanceToNow } from "date-fns";
-
-interface DashboardData {
-  stats: {
-    totalMinted: number;
-    totalRedeemed: number;
-    pendingCompliance: number;
-    activeStablecoins: number;
-  };
-  recentMintRequests: any[];
-  recentRedeemRequests: any[];
-  stablecoins: any[];
-}
 
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -34,11 +21,6 @@ function fmt(n: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(n);
-}
-
-function truncate(s: string, len = 8) {
-  if (!s) return "—";
-  return s.length > len * 2 + 3 ? `${s.slice(0, len)}…${s.slice(-4)}` : s;
 }
 
 const COIN_COLORS = [
@@ -366,7 +348,7 @@ export default function DashboardPage() {
             <div className="h-40 skeleton rounded-lg" />
           ) : (() => {
             const coins = data?.stablecoins ?? [];
-            const coinIdx = coins.findIndex((c: any) => c.id === selectedCoin);
+            const coinIdx = coins.findIndex((c) => c.id === selectedCoin);
             const coin = coins[coinIdx];
             if (!coin) return (
               <div className="text-center py-10" style={{ color: "var(--text-tertiary)" }}>

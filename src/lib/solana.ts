@@ -2,8 +2,6 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  Transaction,
-  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
   getOrCreateAssociatedTokenAccount,
@@ -126,7 +124,7 @@ export async function ensureMintExists(
   // If we have a known mint address, verify it exists
   if (mintAddress) {
     try {
-      const info = await getMintInfo(mintAddress);
+      await getMintInfo(mintAddress);
       return mintAddress;
     } catch {
       // Mint doesn't exist on chain, create a new one

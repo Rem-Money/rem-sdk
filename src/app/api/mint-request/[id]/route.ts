@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getErrorMessage } from "@/lib/demo-types";
 
 export async function GET(
   _req: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
     }
 
     return NextResponse.json(request);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

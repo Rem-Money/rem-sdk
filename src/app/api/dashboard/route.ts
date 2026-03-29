@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getErrorMessage } from "@/lib/demo-types";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 
 type StablecoinRow = {
@@ -87,7 +88,7 @@ export async function GET() {
       recentCompliance: complianceRecords,
       stablecoins: enrichedStablecoins,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

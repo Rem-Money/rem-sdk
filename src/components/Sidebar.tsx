@@ -8,7 +8,6 @@ import {
   ArrowDownCircle,
   ShieldCheck,
   History,
-  Settings,
   Zap,
   ChevronRight,
 } from "lucide-react";

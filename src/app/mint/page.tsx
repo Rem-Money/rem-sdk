@@ -9,17 +9,20 @@ import {
   ExternalLink,
   Info,
   Loader2,
-  AlertTriangle,
   Copy,
   ChevronDown,
   ChevronUp,
-  Globe,
   Banknote,
-  Building2,
   RefreshCw,
 } from "lucide-react";
 import { Card, SectionHeader } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
+import {
+  MintRequestRecord,
+  MintSubmissionResponse,
+  StablecoinRecord,
+  getErrorMessage,
+} from "@/lib/demo-types";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 import { usePhantomWallet } from "@/components/PhantomWalletProvider";
 import { formatDistanceToNow } from "date-fns";
@@ -33,29 +36,14 @@ const NETWORKS = [
 
 const SETTLEMENT_CURRENCIES = ["USD", "EUR", "GBP", "SGD", "AED"];
 
-interface Stablecoin {
-  id: string;
-  symbol: string;
-  name: string;
-  mintAddress: string;
-  decimals: number;
-}
-
-interface MintRequest {
-  id: string;
-  amount: number;
-  destinationWallet: string;
-  status: string;
-  complianceStatus: string;
-  txSignature?: string;
-  txError?: string;
-  kycVerified: boolean;
-  travelRuleData?: any;
-  amlScreening?: any;
-  createdAt: string;
-  updatedAt: string;
-  stablecoin: Stablecoin;
-  complianceRecord?: any;
+interface MintFlowStep {
+  id: number;
+  label: string;
+  done: boolean;
+  detail: string;
+  badge?: string;
+  txSig?: string;
+  failed?: boolean;
 }
 
 function fmt(n: number) {
@@ -191,7 +179,7 @@ function SectionDivider({ icon: Icon, label }: { icon: React.ElementType; label:
   );
 }
 
-function TransactionFlow({ request }: { request: MintRequest }) {
+function TransactionFlow({ request }: { request: MintRequestRecord }) {
   const tr = request.travelRuleData ?? {};
   const bank = tr.bankTransferDetails ?? {};
 
@@ -201,13 +189,12 @@ function TransactionFlow({ request }: { request: MintRequest }) {
   const onChainDone = request.status === "COMPLETED";
   const onChainFailed = request.status === "FAILED";
 
-  const steps = [
+  const steps: MintFlowStep[] = [
     {
       id: 1,
       label: "Request Submitted",
       done: true,
       detail: `${fmt(request.amount)} ${request.stablecoin.symbol} mint requested`,
-      ts: request.createdAt,
     },
     {
       id: 2,
@@ -281,15 +268,15 @@ function TransactionFlow({ request }: { request: MintRequest }) {
               <div
                 className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10"
                 style={{
-                  background: (step as any).failed
+                  background: step.failed
                     ? "var(--error-dim)"
                     : step.done
                       ? "var(--success-dim)"
                       : "var(--bg-elevated)",
-                  border: `2px solid ${(step as any).failed ? "var(--error)" : step.done ? "var(--success)" : "var(--border-bright)"}`,
+                  border: `2px solid ${step.failed ? "var(--error)" : step.done ? "var(--success)" : "var(--border-bright)"}`,
                 }}
               >
-                {(step as any).failed ? (
+                {step.failed ? (
                   <XCircle size={12} style={{ color: "var(--error)" }} />
                 ) : step.done ? (
                   <CheckCircle2 size={12} style={{ color: "var(--success)" }} />
@@ -311,21 +298,21 @@ function TransactionFlow({ request }: { request: MintRequest }) {
                 <span
                   className="text-sm font-medium"
                   style={{
-                    color: (step as any).failed ? "var(--error)" : step.done ? "var(--text-primary)" : "var(--text-secondary)",
+                    color: step.failed ? "var(--error)" : step.done ? "var(--text-primary)" : "var(--text-secondary)",
                     fontFamily: "var(--font-body)",
                   }}
                 >
                   {step.label}
                 </span>
-                {(step as any).badge && <StatusBadge status={(step as any).badge} />}
+                {step.badge && <StatusBadge status={step.badge} />}
               </div>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
                 {step.detail}
-                {(step as any).txSig && (
+                {step.txSig && (
                   <>
-                    <CopyButton text={(step as any).txSig} />
+                    <CopyButton text={step.txSig} />
                     <a
-                      href={`https://explorer.solana.com/tx/${(step as any).txSig}?cluster=devnet`}
+                      href={`https://explorer.solana.com/tx/${step.txSig}?cluster=devnet`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-2 inline-flex items-center gap-1"
@@ -345,7 +332,7 @@ function TransactionFlow({ request }: { request: MintRequest }) {
   );
 }
 
-function RequestRow({ request, onExpand, expanded }: { request: MintRequest; onExpand: () => void; expanded: boolean }) {
+function RequestRow({ request, onExpand, expanded }: { request: MintRequestRecord; onExpand: () => void; expanded: boolean }) {
   const bank = request.travelRuleData?.bankTransferDetails;
   return (
     <>
@@ -362,7 +349,7 @@ function RequestRow({ request, onExpand, expanded }: { request: MintRequest; onE
         <td>
           {bank?.wireReference ? (
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--success-dim)", color: "var(--success)" }}>
-              {bank.wireReference}
+              {String(bank.wireReference)}
             </span>
           ) : (
             <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>—</span>
@@ -411,7 +398,7 @@ function RequestRow({ request, onExpand, expanded }: { request: MintRequest; onE
                       Fiat Wire Details
                     </h4>
                     <div className="rounded-lg p-3 space-y-1.5 text-xs" style={{ background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "var(--font-mono)" }}>
-                      {Object.entries(request.travelRuleData.bankTransferDetails).map(([k, v]) => (
+                      {Object.entries(request.travelRuleData.bankTransferDetails ?? {}).map(([k, v]) => (
                         <div key={k} className="flex gap-2">
                           <span style={{ color: "var(--text-tertiary)", minWidth: "160px", flexShrink: 0 }}>{k}</span>
                           <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
@@ -445,7 +432,7 @@ function RequestRow({ request, onExpand, expanded }: { request: MintRequest; onE
                   </h4>
                   {request.amlScreening ? (
                     <div className="rounded-lg p-3 space-y-1.5 text-xs" style={{ background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "var(--font-mono)" }}>
-                      {Object.entries(request.amlScreening)
+                      {Object.entries(request.amlScreening ?? {})
                         .filter(([k]) => !["timestamp"].includes(k))
                         .map(([k, v]) => (
                           <div key={k} className="flex gap-2">
@@ -472,11 +459,11 @@ function RequestRow({ request, onExpand, expanded }: { request: MintRequest; onE
 export default function MintPage() {
   const inst = PLACEHOLDER_INSTITUTION;
   const wallet = usePhantomWallet();
-  const [stablecoins, setStablecoins] = useState<Stablecoin[]>([]);
-  const [requests, setRequests] = useState<MintRequest[]>([]);
+  const [stablecoins, setStablecoins] = useState<StablecoinRecord[]>([]);
+  const [requests, setRequests] = useState<MintRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<MintSubmissionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -501,8 +488,10 @@ export default function MintPage() {
     setRefreshing(true);
     try {
       const res = await fetch("/api/mint-request");
-      setRequests(await res.json());
-    } catch { } finally {
+      setRequests((await res.json()) as MintRequestRecord[]);
+    } catch {
+      // ignore background refresh errors
+    } finally {
       setRefreshing(false);
     }
   }
@@ -511,8 +500,8 @@ export default function MintPage() {
     async function load() {
       try {
         const [coinsRes, reqsRes] = await Promise.all([fetch("/api/stablecoins"), fetch("/api/mint-request")]);
-        setStablecoins(await coinsRes.json());
-        setRequests(await reqsRes.json());
+        setStablecoins((await coinsRes.json()) as StablecoinRecord[]);
+        setRequests((await reqsRes.json()) as MintRequestRecord[]);
       } finally {
         setLoading(false);
       }
@@ -556,18 +545,18 @@ export default function MintPage() {
           },
         }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as MintSubmissionResponse & { error?: string };
       if (!res.ok) {
-        setError(data.error);
+        setError(data.error ?? "Failed to submit mint request");
       } else {
         setResult(data);
         const reqsRes = await fetch("/api/mint-request");
-        setRequests(await reqsRes.json());
+        setRequests((await reqsRes.json()) as MintRequestRecord[]);
         if (data.mintRequest?.id) setExpandedId(data.mintRequest.id);
         setForm((f) => ({ ...f, amount: "", wireReference: "", sendingBank: "", bankSwiftBic: "" }));
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -707,7 +696,7 @@ export default function MintPage() {
                 >
                   <Info size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0, marginTop: "1px" }} />
                   <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                    Provide the wire details for the corresponding fiat transfer. These are matched against the issuer's bank records before tokens are minted.
+                    Provide the wire details for the corresponding fiat transfer. These are matched against the issuer&apos;s bank records before tokens are minted.
                   </p>
                 </div>
 

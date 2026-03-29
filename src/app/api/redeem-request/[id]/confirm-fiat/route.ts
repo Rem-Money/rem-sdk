@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getErrorMessage, toJsonObject } from "@/lib/demo-types";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 
 // POST /api/redeem-request/:id/confirm-fiat
@@ -66,7 +67,7 @@ export async function POST(
         fiatConfirmedAt: now,
         // Append confirmation to travel rule data for audit trail
         travelRuleData: {
-          ...(request.travelRuleData as object),
+          ...toJsonObject(request.travelRuleData),
           fiatConfirmation: {
             confirmedAt: now.toISOString(),
             confirmedBy: confirmedBy ?? "Institution Operator",
@@ -82,8 +83,8 @@ export async function POST(
       redeemRequest: completed,
       message: `Fiat receipt confirmed. Redeem request for ${request.amount.toLocaleString()} ${request.stablecoin.symbol} is now complete.`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Confirm fiat error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }
