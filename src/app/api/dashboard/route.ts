@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { StablecoinMint } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 
@@ -45,7 +46,7 @@ export async function GET() {
     for (const r of allRedeems)
       redeemedByCoin[r.stablecoinMintId] = (redeemedByCoin[r.stablecoinMintId] ?? 0) + r.amount;
 
-    const enrichedStablecoins = stablecoins.map((coin) => ({
+    const enrichedStablecoins = stablecoins.map((coin: StablecoinMint) => ({
       ...coin,
       totalMinted: mintedByCoin[coin.id] ?? 0,
       totalRedeemed: redeemedByCoin[coin.id] ?? 0,
