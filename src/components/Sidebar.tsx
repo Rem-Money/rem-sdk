@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -36,12 +37,14 @@ export function Sidebar() {
         className="flex items-center gap-2.5 px-5 py-5"
         style={{ borderBottom: "1px solid var(--border)" }}
       >
-        <div
+        <Image src="/logo.png" alt="REM logo" width={24} height={24} priority />
+        {/* <div
           className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
           style={{ background: "var(--accent)", color: "#000" }}
         >
           <Zap size={14} strokeWidth={2.5} />
-        </div>
+        </div> */}
+
         <div>
           <div
             className="text-sm font-bold leading-none"

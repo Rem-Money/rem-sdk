@@ -1,6 +1,7 @@
 "use client";
 
-import { Building2, ShieldCheck, ChevronDown, Wallet2, PlugZap, LogOut } from "lucide-react";
+import Image from "next/image";
+import { ShieldCheck, ChevronDown, Wallet2, PlugZap, LogOut } from "lucide-react";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 import { usePhantomWallet } from "@/components/PhantomWalletProvider";
 import { useMockAuth } from "@/components/MockAuthProvider";
@@ -27,8 +28,17 @@ export function TopBar() {
         borderBottom: "1px solid var(--border)",
       }}
     >
-      {/* Left - breadcrumb placeholder */}
-      <div />
+      <div className="flex items-center gap-3">
+
+        <div className="flex flex-col leading-none">
+          <span
+            className="text-[10px] uppercase tracking-[0.22em]"
+            style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}
+          >
+            Operations Console
+          </span>
+        </div>
+      </div>
 
       {/* Right - entity chip */}
       <div className="flex items-center gap-3">
@@ -117,7 +127,7 @@ export function TopBar() {
             className="w-5 h-5 rounded flex items-center justify-center"
             style={{ background: "var(--accent-subtle)", border: "1px solid var(--accent-glow)" }}
           >
-            <Building2 size={11} style={{ color: "var(--accent)" }} />
+            <Image src="/logo.png" alt="REM logo" width={12} height={12} />
           </div>
           <span style={{ fontFamily: "var(--font-body)", fontWeight: 500 }}>
             {inst.name}

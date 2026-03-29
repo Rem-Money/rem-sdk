@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   createContext,
   useContext,
@@ -7,12 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  ArrowRight,
-  Building2,
-  LoaderCircle,
-  LockKeyhole,
-} from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 
 type AuthStatus = "checking" | "signed_out" | "signing_in" | "signed_in";
@@ -120,7 +116,7 @@ function MockSignInScreen() {
                   className="w-10 h-10 rounded-[10px] flex items-center justify-center"
                   style={{ background: "rgba(56,189,248,0.12)", border: "1px solid rgba(56,189,248,0.24)" }}
                 >
-                  <LockKeyhole size={18} style={{ color: "var(--info)" }} />
+                  <Image src="/logo.png" alt="REM logo" width={22} height={22} priority />
                 </div>
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.28em]" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
@@ -222,12 +218,7 @@ function MockSignInScreen() {
                 }}
               >
                 <div className="flex items-start gap-4">
-                  <div
-                    className="w-12 h-12 rounded-[8px] flex items-center justify-center shrink-0"
-                    style={{ background: "#dbeafe", color: "#1d4ed8" }}
-                  >
-                    <Building2 size={18} />
-                  </div>
+
                   <div>
                     <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Institutional access</p>
                     <p className="text-[1.55rem] font-semibold mt-2 leading-tight text-slate-950">{auth.institutionName}</p>
