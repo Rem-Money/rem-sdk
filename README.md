@@ -1,4 +1,4 @@
-# rem SDK — Institutional Stablecoin Operations Platform
+# REM Protocol — Institutional Stablecoin Operations Platform
 ![alt text](./public/image.png)
 A web application for financial institutions to raise, track, and settle mint and redemption requests for stablecoins on Solana. Built with a full compliance layer covering KYC, AML screening, FATF Travel Rule, and OFAC checks. 
 
