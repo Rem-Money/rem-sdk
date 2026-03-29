@@ -28,7 +28,7 @@ const prisma = new PrismaClient({ adapter });
 
 const INST = {
   id: "inst_apex_capital_001",
-  name: "Apex Capital LLC",
+  name: "AMINA Bank AG ",
   leiCode: "254900HROIFWPRGM1V77",
   jurisdiction: "US",
   entityType: "INVESTMENT_FUND",
@@ -61,7 +61,7 @@ function tr(overrides = {}) {
     originatorJurisdiction: INST.jurisdiction,
     originatorWallet: INST.walletAddress,
     fatfCompliant: true,
-    vasp: "Apex Capital LLC",
+    vasp: "AMINA Bank AG ",
     vaspId: "APEX-001",
     ...overrides,
   };

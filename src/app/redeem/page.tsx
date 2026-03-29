@@ -261,7 +261,7 @@ function RedeemFlow({
     {
       id: 4, label: "Travel Rule Filed", done: !!request.travelRuleData,
       detail: request.travelRuleData
-        ? `FATF Compliant · VASP: ${tr.vasp ?? "Apex Capital LLC"}`
+        ? `FATF Compliant · VASP: ${tr.vasp ?? "AMINA Bank AG "}`
         : "Travel rule data pending",
       badge: request.travelRuleData ? "COMPLIANT" : "PENDING",
     },

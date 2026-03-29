@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       network: network ?? "solana-devnet",
       timestamp: new Date().toISOString(),
       fatfCompliant: !amlFlagged,
-      vasp: "Apex Capital LLC",
+      vasp: "AMINA Bank AG ",
       ...(settlementDetails ? { settlementDetails } : {}),
     };
 

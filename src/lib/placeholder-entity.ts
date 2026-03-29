@@ -3,7 +3,7 @@
 
 export const PLACEHOLDER_INSTITUTION = {
   id: "inst_apex_capital_001",
-  name: "Apex Capital LLC",
+  name: "AMINA Bank AG ",
   leiCode: "254900HROIFWPRGM1V77",
   jurisdiction: "US",
   entityType: "Financial Institution",

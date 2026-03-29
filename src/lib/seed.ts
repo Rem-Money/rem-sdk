@@ -29,7 +29,7 @@ function mockTravelRule(overrides: Record<string, unknown> = {}): Prisma.InputJs
     originatorJurisdiction: PLACEHOLDER_INSTITUTION.jurisdiction,
     originatorWallet: PLACEHOLDER_INSTITUTION.walletAddress,
     fatfCompliant: true,
-    vasp: "Apex Capital LLC",
+    vasp: "AMINA Bank AG ",
     vaspId: "APEX-001",
     ...overrides,
   };
@@ -307,8 +307,10 @@ export async function seed() {
         currency: "USD",
         network: "solana-devnet",
         timestamp: daysAgo(12).toISOString(),
-        settlementDetails: { ...baseSettlement, transferReference: "INV-2024-00091", paymentRails: "CHAPS",
-          fiatConfirmation: { confirmedAt: daysAgo(11).toISOString(), confirmedBy: "Institution Operator", bankConfirmationRef: "CHAPS-REF-00091" } },
+        settlementDetails: {
+          ...baseSettlement, transferReference: "INV-2024-00091", paymentRails: "CHAPS",
+          fiatConfirmation: { confirmedAt: daysAgo(11).toISOString(), confirmedBy: "Institution Operator", bankConfirmationRef: "CHAPS-REF-00091" }
+        },
       }),
       fiatSettlementStatus: "CONFIRMED",
       fiatReference: "CHAPS-REF-00091",
@@ -337,8 +339,10 @@ export async function seed() {
         network: "solana-devnet",
         timestamp: daysAgo(8).toISOString(),
         originatorJurisdiction: "DE",
-        settlementDetails: { ...baseSettlement, beneficiaryBank: "Deutsche Bank", bankSwiftBic: "DEUTDEDB", iban: "DE89370400440532013000", transferReference: "INV-2024-00104", paymentRails: "SEPA",
-          fiatConfirmation: { confirmedAt: daysAgo(7).toISOString(), confirmedBy: "Institution Operator", bankConfirmationRef: "SEPA-REF-00104" } },
+        settlementDetails: {
+          ...baseSettlement, beneficiaryBank: "Deutsche Bank", bankSwiftBic: "DEUTDEDB", iban: "DE89370400440532013000", transferReference: "INV-2024-00104", paymentRails: "SEPA",
+          fiatConfirmation: { confirmedAt: daysAgo(7).toISOString(), confirmedBy: "Institution Operator", bankConfirmationRef: "SEPA-REF-00104" }
+        },
       }),
       fiatSettlementStatus: "CONFIRMED",
       fiatReference: "SEPA-REF-00104",
@@ -367,8 +371,10 @@ export async function seed() {
         network: "solana-devnet",
         timestamp: daysAgo(4).toISOString(),
         originatorJurisdiction: "FR",
-        settlementDetails: { ...baseSettlement, beneficiaryBank: "BNP Paribas", bankSwiftBic: "BNPAFRPP", iban: "FR7630006000011234567890189", transferReference: "INV-2024-00117", paymentRails: "SEPA",
-          fiatConfirmation: { confirmedAt: daysAgo(3).toISOString(), confirmedBy: "Institution Operator", bankConfirmationRef: "SEPA-REF-00117" } },
+        settlementDetails: {
+          ...baseSettlement, beneficiaryBank: "BNP Paribas", bankSwiftBic: "BNPAFRPP", iban: "FR7630006000011234567890189", transferReference: "INV-2024-00117", paymentRails: "SEPA",
+          fiatConfirmation: { confirmedAt: daysAgo(3).toISOString(), confirmedBy: "Institution Operator", bankConfirmationRef: "SEPA-REF-00117" }
+        },
       }),
       fiatSettlementStatus: "CONFIRMED",
       fiatReference: "SEPA-REF-00117",

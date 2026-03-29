@@ -77,7 +77,7 @@
   "amount": "50000.00",
   "sourceWallet": "7Yq9pKcrHfXpQvW8mQkP3KXrVwR4cD2u8s3N6Lz5pQaM",
   "destinationBankAccount": "GB29NWBK60161331926819",
-  "accountHolderName": "Apex Capital LLC",
+  "accountHolderName": "AMINA Bank AG ",
   "beneficiaryBank": "NatWest",
   "bankSwiftBic": "NWBKGB2L",
   "paymentRails": "SWIFT",
