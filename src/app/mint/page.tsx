@@ -897,7 +897,7 @@ export default function MintPage() {
                       type="date"
                       disabled={mintFormDisabled}
                     />
-                    <SelectField label="Settlement Currency" value={form.settlementCurrency} onChange={set("settlementCurrency")} disabled={mintFormDisabled}>
+                    <SelectField label="Settlement In" value={form.settlementCurrency} onChange={set("settlementCurrency")} disabled={mintFormDisabled}>
                       {SETTLEMENT_CURRENCIES.map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}

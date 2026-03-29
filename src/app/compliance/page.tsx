@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ShieldCheck,
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
   Eye,
   TrendingUp,
   Building2,
+  ExternalLink,
 } from "lucide-react";
 import { Card, SectionHeader, StatCard } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -52,6 +53,55 @@ function RiskMeter({ score }: { score?: number }) {
 
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+}
+
+function truncate(s: string, len = 10) {
+  if (!s) return "—";
+  return s.length > len * 2 ? `${s.slice(0, len)}…${s.slice(-5)}` : s;
+}
+
+function renderNoteWithTxLinks(note: string) {
+  const txPattern = /(Tx(?:\s+ID)?\s*:\s*)([1-9A-HJ-NP-Za-km-z]{24,88})/gi;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const match of note.matchAll(txPattern)) {
+    const [, label, signature] = match;
+    const start = match.index ?? 0;
+    const signatureStart = start + label.length;
+
+    if (start > lastIndex) {
+      parts.push(note.slice(lastIndex, start));
+    }
+
+    parts.push(label);
+    parts.push(
+      <a
+        key={`${signature}-${start}`}
+        href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={signature}
+        className="inline-flex items-center gap-1 align-middle"
+        style={{ color: "var(--accent)" }}
+      >
+        {truncate(signature, 6)}
+        <ExternalLink size={10} />
+      </a>
+    );
+
+    lastIndex = signatureStart + signature.length;
+  }
+
+  if (parts.length === 0) {
+    return note;
+  }
+
+  if (lastIndex < note.length) {
+    parts.push(note.slice(lastIndex));
+  }
+
+  return parts;
 }
 
 export default function CompliancePage() {
@@ -291,7 +341,7 @@ export default function CompliancePage() {
               {selected.notes && (
                 <div className="p-2.5 rounded-lg" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}>
                   <p className="text-[10px] font-semibold mb-1 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>Review Notes</p>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{selected.notes}</p>
+                  <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{renderNoteWithTxLinks(selected.notes)}</p>
                 </div>
               )}
 
