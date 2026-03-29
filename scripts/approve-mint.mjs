@@ -28,12 +28,12 @@ for (const file of [".env.local", ".env"]) {
 }
 
 const { PrismaClient } = await import("@prisma/client");
-const { PrismaNeon } = await import("@prisma/adapter-neon");
+const { PrismaPg } = await import("@prisma/adapter-pg");
 const { Connection, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } = await import("@solana/web3.js");
 const { getOrCreateAssociatedTokenAccount, mintTo, getMint } = await import("@solana/spl-token");
 const bs58 = await import("bs58");
 
-const adapter = new PrismaNeon({ connectionString: process.env.REM_DATABASE_URL });
+const adapter = new PrismaPg({ connectionString: process.env.REM_DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 const SOLANA_RPC = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";

@@ -10,8 +10,8 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-// Load .env.local / .env manually
-for (const file of [".env.local", ".env"]) {
+// Load .env first, then .env.local so local overrides win.
+for (const file of [".env", ".env.local"]) {
   try {
     const content = readFileSync(resolve(root, file), "utf8");
     for (const line of content.split("\n")) {
@@ -22,9 +22,9 @@ for (const file of [".env.local", ".env"]) {
 }
 
 const { PrismaClient } = await import("@prisma/client");
-const { PrismaNeon } = await import("@prisma/adapter-neon");
+const { PrismaPg } = await import("@prisma/adapter-pg");
 
-const adapter = new PrismaNeon({ connectionString: process.env.REM_DATABASE_URL });
+const adapter = new PrismaPg({ connectionString: process.env.REM_DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 const INST = {

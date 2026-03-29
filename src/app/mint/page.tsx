@@ -21,6 +21,7 @@ import {
 import { Card, SectionHeader } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
+import { usePhantomWallet } from "@/components/PhantomWalletProvider";
 import { formatDistanceToNow } from "date-fns";
 
 const NETWORKS = [
@@ -90,8 +91,8 @@ function SelectField({
   return (
     <div>
       <label
-        className="block text-xs mb-1.5 uppercase tracking-wider"
-        style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}
+        className="block text-[11px] mb-2 uppercase tracking-[0.16em] font-semibold"
+        style={{ color: "#edf4ff", fontFamily: "var(--font-mono)", textShadow: "0 0 18px rgba(255,255,255,0.05)" }}
       >
         {label}
       </label>
@@ -99,22 +100,29 @@ function SelectField({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full py-2.5 px-3 pr-8 rounded-lg text-sm outline-none appearance-none cursor-pointer transition-all"
+          className="w-full py-3 px-3.5 pr-9 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all"
           style={{
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
+            background: "linear-gradient(180deg, rgba(17,21,32,0.96) 0%, rgba(11,15,24,0.96) 100%)",
+            border: "1px solid var(--border-bright)",
             color: "var(--text-primary)",
             fontFamily: "var(--font-mono)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
           }}
-          onFocus={(e) => (e.target.style.borderColor = `var(--${accentFocus})`)}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+          onFocus={(e) => {
+            e.target.style.borderColor = `var(--${accentFocus})`;
+            e.target.style.boxShadow = `0 0 0 3px color-mix(in srgb, var(--${accentFocus}) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.04)`;
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "var(--border-bright)";
+            e.target.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.04)";
+          }}
         >
           {children}
         </select>
         <ChevronDown
-          size={13}
+          size={14}
           className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-          style={{ color: "var(--text-tertiary)" }}
+          style={{ color: "var(--text-secondary)" }}
         />
       </div>
     </div>
@@ -130,12 +138,12 @@ function InputField({
 }) {
   return (
     <div>
-      <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+      <label className="block text-[11px] mb-2 uppercase tracking-[0.16em] font-semibold" style={{ color: "#edf4ff", fontFamily: "var(--font-mono)", textShadow: "0 0 18px rgba(255,255,255,0.05)" }}>
         {label}{required && <span style={{ color: "var(--error)" }}> *</span>}
       </label>
       <div className="relative">
         {prefix && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
             {prefix}
           </span>
         )}
@@ -145,33 +153,40 @@ function InputField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full py-2.5 rounded-lg text-sm outline-none transition-all"
+          className="w-full py-3 rounded-xl text-sm outline-none transition-all placeholder:text-[#64748b]"
           style={{
-            paddingLeft: prefix ? "1.5rem" : "0.75rem",
-            paddingRight: "0.75rem",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
-            color: "var(--text-primary)",
+            paddingLeft: prefix ? "1.85rem" : "0.9rem",
+            paddingRight: "0.9rem",
+            background: "linear-gradient(180deg, rgba(17,21,32,0.96) 0%, rgba(11,15,24,0.96) 100%)",
+            border: "1px solid var(--border-bright)",
+            color: "#fff",
             fontFamily: "var(--font-mono)",
             fontSize: fontSize ?? "13px",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
           }}
-          onFocus={(e) => (e.target.style.borderColor = `var(--${accentFocus})`)}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+          onFocus={(e) => {
+            e.target.style.borderColor = `var(--${accentFocus})`;
+            e.target.style.boxShadow = `0 0 0 3px color-mix(in srgb, var(--${accentFocus}) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.04)`;
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "var(--border-bright)";
+            e.target.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.04)";
+          }}
         />
       </div>
-      {hint && <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>{hint}</p>}
+      {hint && <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>{hint}</p>}
     </div>
   );
 }
 
 function SectionDivider({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
-    <div className="flex items-center gap-2 pt-1 pb-0.5">
-      <Icon size={12} style={{ color: "var(--text-tertiary)" }} />
-      <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+    <div className="flex items-center gap-2 pt-2 pb-1">
+      <Icon size={12} style={{ color: "var(--text-secondary)" }} />
+      <span className="text-[11px] uppercase tracking-[0.2em] font-semibold" style={{ color: "#dbe7ff", fontFamily: "var(--font-mono)" }}>
         {label}
       </span>
-      <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+      <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, var(--border-bright), transparent)" }} />
     </div>
   );
 }
@@ -235,8 +250,8 @@ function TransactionFlow({ request }: { request: MintRequest }) {
       detail: onChainDone
         ? `${bank.sendingBank ? `Wire from ${bank.sendingBank}` : "Fiat wire"} confirmed received · Ref: ${bank.wireReference ?? "—"}`
         : complianceDone
-        ? "Issuer confirming fiat wire receipt before minting"
-        : "Pending compliance approval",
+          ? "Issuer confirming fiat wire receipt before minting"
+          : "Pending compliance approval",
       badge: onChainDone ? "CONFIRMED" : complianceDone ? "AWAITING" : "PENDING",
     },
     {
@@ -247,10 +262,10 @@ function TransactionFlow({ request }: { request: MintRequest }) {
       detail: request.txSignature
         ? `Tokens minted · Tx: ${truncate(request.txSignature, 8)}`
         : onChainFailed
-        ? request.txError ?? "Mint failed"
-        : complianceDone
-        ? "Run: node scripts/approve-mint.mjs " + request.id
-        : "Pending compliance",
+          ? request.txError ?? "Mint failed"
+          : complianceDone
+            ? "Run: node scripts/approve-mint.mjs " + request.id
+            : "Pending compliance",
       txSig: request.txSignature,
       badge: onChainDone ? "COMPLETED" : onChainFailed ? "FAILED" : "PENDING",
     },
@@ -269,8 +284,8 @@ function TransactionFlow({ request }: { request: MintRequest }) {
                   background: (step as any).failed
                     ? "var(--error-dim)"
                     : step.done
-                    ? "var(--success-dim)"
-                    : "var(--bg-elevated)",
+                      ? "var(--success-dim)"
+                      : "var(--bg-elevated)",
                   border: `2px solid ${(step as any).failed ? "var(--error)" : step.done ? "var(--success)" : "var(--border-bright)"}`,
                 }}
               >
@@ -456,6 +471,7 @@ function RequestRow({ request, onExpand, expanded }: { request: MintRequest; onE
 
 export default function MintPage() {
   const inst = PLACEHOLDER_INSTITUTION;
+  const wallet = usePhantomWallet();
   const [stablecoins, setStablecoins] = useState<Stablecoin[]>([]);
   const [requests, setRequests] = useState<MintRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -486,7 +502,7 @@ export default function MintPage() {
     try {
       const res = await fetch("/api/mint-request");
       setRequests(await res.json());
-    } catch {} finally {
+    } catch { } finally {
       setRefreshing(false);
     }
   }
@@ -503,6 +519,17 @@ export default function MintPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    const connectedAddress = wallet.address;
+    if (!connectedAddress) return;
+    setForm((current) => {
+      if (current.destinationWallet && current.destinationWallet !== inst.walletAddress) {
+        return current;
+      }
+      return { ...current, destinationWallet: connectedAddress };
+    });
+  }, [inst.walletAddress, wallet.address]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -563,129 +590,174 @@ export default function MintPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Form */}
         <div className="lg:col-span-1 space-y-4 animate-fade-in stagger-1">
-          <Card>
+          <Card
+            className="relative overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg, rgba(13,16,24,0.98) 0%, rgba(8,10,16,0.98) 100%)",
+              border: "1px solid var(--border-bright)",
+              boxShadow: "0 22px 40px rgba(0,0,0,0.28)",
+            }}
+          >
             <SectionHeader title="New Mint Request" subtitle="KYC + Travel Rule auto-verified" />
             <form onSubmit={handleSubmit} className="space-y-4">
-
-              {/* Network */}
-              <SelectField label="Network" value={form.network} onChange={set("network")}>
-                {NETWORKS.map((n) => (
-                  <option key={n.id} value={n.id} disabled={n.disabled}>
-                    {n.label}{n.disabled ? " — Coming Soon" : ""}
-                  </option>
-                ))}
-              </SelectField>
-
-              {/* Stablecoin */}
-              <div>
-                <SelectField label="Stablecoin" value={form.stablecoinSymbol} onChange={set("stablecoinSymbol")}>
-                  {loading ? (
-                    <option>Loading…</option>
-                  ) : (
-                    stablecoins.map((coin) => (
-                      <option key={coin.symbol} value={coin.symbol}>
-                        {coin.symbol} — {coin.name}
-                      </option>
-                    ))
-                  )}
-                </SelectField>
-                {selectedCoin && (
-                  <div
-                    className="mt-2 text-[10px] px-2 py-1 rounded flex items-center gap-1"
-                    style={{ background: "var(--bg-elevated)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", border: "1px solid var(--border)" }}
-                  >
-                    <span className="truncate">{truncate(selectedCoin.mintAddress, 12)}</span>
-                    <CopyButton text={selectedCoin.mintAddress} />
-                  </div>
-                )}
-              </div>
-
-              {/* Amount */}
-              <div>
-                <InputField
-                  label="Amount (USD)"
-                  value={form.amount}
-                  onChange={set("amount")}
-                  placeholder="100,000.00"
-                  prefix="$"
-                  required
-                />
-                {form.amount && !isNaN(parseFloat(form.amount)) && (
-                  <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                    = {parseFloat(form.amount).toLocaleString()} {form.stablecoinSymbol}
+              <div
+                className="grid grid-cols-2 gap-2 rounded-xl p-3"
+                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+              >
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                    Mint flow
                   </p>
-                )}
+                  <p className="text-sm mt-1 font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
+                    Fiat matched before issuance
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                    Compliance
+                  </p>
+                  <p className="text-sm mt-1 font-semibold" style={{ color: "var(--accent)", fontFamily: "var(--font-display)" }}>
+                    KYC + AML + Travel Rule
+                  </p>
+                </div>
               </div>
 
-              {/* Destination wallet */}
-              <InputField
-                label="Destination Wallet"
-                value={form.destinationWallet}
-                onChange={set("destinationWallet")}
-                placeholder="Solana wallet address"
-                required
-                fontSize="11px"
-              />
+              <div
+                className="space-y-4 rounded-xl p-4"
+                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+              >
+
+                {/* Network */}
+                <SelectField label="Network" value={form.network} onChange={set("network")}>
+                  {NETWORKS.map((n) => (
+                    <option key={n.id} value={n.id} disabled={n.disabled}>
+                      {n.label}{n.disabled ? " — Coming Soon" : ""}
+                    </option>
+                  ))}
+                </SelectField>
+
+                {/* Stablecoin */}
+                <div>
+                  <SelectField label="Stablecoin" value={form.stablecoinSymbol} onChange={set("stablecoinSymbol")}>
+                    {loading ? (
+                      <option>Loading…</option>
+                    ) : (
+                      stablecoins.map((coin) => (
+                        <option key={coin.symbol} value={coin.symbol}>
+                          {coin.symbol} — {coin.name}
+                        </option>
+                      ))
+                    )}
+                  </SelectField>
+                  {selectedCoin && (
+                    <div
+                      className="mt-2 text-[10px] px-2 py-1 rounded flex items-center gap-1"
+                      style={{ background: "var(--bg-elevated)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", border: "1px solid var(--border)" }}
+                    >
+                      <span className="truncate">{truncate(selectedCoin.mintAddress, 12)}</span>
+                      <CopyButton text={selectedCoin.mintAddress} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <InputField
+                    label="Amount (USD)"
+                    value={form.amount}
+                    onChange={set("amount")}
+                    placeholder="100,000.00"
+                    prefix="$"
+                    required
+                  />
+                  {form.amount && !isNaN(parseFloat(form.amount)) && (
+                    <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                      = {parseFloat(form.amount).toLocaleString()} {form.stablecoinSymbol}
+                    </p>
+                  )}
+                </div>
+
+                {/* Destination wallet */}
+                <InputField
+                  label="Destination Wallet"
+                  value={form.destinationWallet}
+                  onChange={set("destinationWallet")}
+                  placeholder={wallet.connected ? "Connected Phantom wallet" : "Solana wallet address"}
+                  required
+                  fontSize="11px"
+                  hint={
+                    wallet.connected && wallet.shortAddress
+                      ? `Connected Phantom: ${wallet.shortAddress}`
+                      : "Use the destination wallet that should receive the minted stablecoins."
+                  }
+                />
+              </div>
 
               {/* ── Off-chain fiat transfer section ── */}
               <SectionDivider icon={Banknote} label="Off-Chain Fiat Transfer" />
 
               <div
-                className="p-3 rounded-lg flex gap-2.5"
-                style={{ background: "rgba(120,137,171,0.06)", border: "1px solid var(--border)" }}
+                className="space-y-4 rounded-xl p-4"
+                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
               >
-                <Info size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0, marginTop: "1px" }} />
-                <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
-                  Provide the wire details for the corresponding fiat transfer. These are matched against the issuer's bank records before tokens are minted.
-                </p>
-              </div>
 
-              <InputField
-                label="Wire / Transfer Reference"
-                value={form.wireReference}
-                onChange={set("wireReference")}
-                placeholder="e.g. SWIFT ref, fedwire ID, IMAD"
-                hint="Your bank's reference number for this wire transfer"
-              />
+                <div
+                  className="p-3 rounded-lg flex gap-2.5"
+                  style={{ background: "rgba(120,137,171,0.08)", border: "1px solid var(--border-bright)" }}
+                >
+                  <Info size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0, marginTop: "1px" }} />
+                  <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    Provide the wire details for the corresponding fiat transfer. These are matched against the issuer's bank records before tokens are minted.
+                  </p>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <InputField
-                  label="Sending Bank"
-                  value={form.sendingBank}
-                  onChange={set("sendingBank")}
-                  placeholder="e.g. JPMorgan Chase"
+                  label="Wire / Transfer Reference"
+                  value={form.wireReference}
+                  onChange={set("wireReference")}
+                  placeholder="e.g. SWIFT ref, fedwire ID, IMAD"
+                  hint="Your bank's reference number for this wire transfer"
                 />
-                <InputField
-                  label="SWIFT / BIC"
-                  value={form.bankSwiftBic}
-                  onChange={set("bankSwiftBic")}
-                  placeholder="e.g. CHASUS33"
-                />
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <InputField
-                  label="Transfer Date"
-                  value={form.transferDate}
-                  onChange={set("transferDate")}
-                  type="date"
-                />
-                <SelectField label="Settlement Currency" value={form.settlementCurrency} onChange={set("settlementCurrency")}>
-                  {SETTLEMENT_CURRENCIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </SelectField>
+                <div className="grid grid-cols-2 gap-3">
+                  <InputField
+                    label="Sending Bank"
+                    value={form.sendingBank}
+                    onChange={set("sendingBank")}
+                    placeholder="e.g. JPMorgan Chase"
+                  />
+                  <InputField
+                    label="SWIFT / BIC"
+                    value={form.bankSwiftBic}
+                    onChange={set("bankSwiftBic")}
+                    placeholder="e.g. CHASUS33"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <InputField
+                    label="Transfer Date"
+                    value={form.transferDate}
+                    onChange={set("transferDate")}
+                    type="date"
+                  />
+                  <SelectField label="Settlement Currency" value={form.settlementCurrency} onChange={set("settlementCurrency")}>
+                    {SETTLEMENT_CURRENCIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </SelectField>
+                </div>
               </div>
 
               {/* ── Compliance notice ── */}
               <div
                 className="p-3 rounded-lg flex gap-2.5"
-                style={{ background: "var(--accent-subtle)", border: "1px solid var(--accent-glow)" }}
+                style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)" }}
               >
                 <ShieldCheck size={13} style={{ color: "var(--accent)", flexShrink: 0, marginTop: "1px" }} />
                 <div>
                   <p className="text-xs font-medium" style={{ color: "var(--accent)" }}>Auto-Compliance Enabled</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-[12px] mt-0.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                     KYC, AML screening, and FATF Travel Rule data will be automatically applied.
                   </p>
                 </div>

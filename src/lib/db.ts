@@ -1,15 +1,15 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaNeon } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  const adapter = new PrismaNeon({
+  const adapter = new PrismaPg({
     connectionString: process.env.REM_DATABASE_URL,
   });
-  return new PrismaClient({ adapter, log: ["error"] } as any) as PrismaClient;
+  return new PrismaClient({ adapter, log: ["error"] });
 }
 
 export const prisma: PrismaClient =

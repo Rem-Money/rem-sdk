@@ -18,6 +18,7 @@ import {
 import { Card, SectionHeader } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
+import { usePhantomWallet } from "@/components/PhantomWalletProvider";
 import { formatDistanceToNow } from "date-fns";
 
 const NETWORKS = [
@@ -71,21 +72,33 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+      <label className="block text-[11px] mb-2 uppercase tracking-[0.16em] font-semibold" style={{ color: "#edf4ff", fontFamily: "var(--font-mono)", textShadow: "0 0 18px rgba(255,255,255,0.05)" }}>
         {label}
       </label>
       <div className="relative">
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full py-2.5 px-3 pr-8 rounded-lg text-sm outline-none appearance-none cursor-pointer transition-all"
-          style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}
-          onFocus={(e) => (e.target.style.borderColor = `var(--${accentFocus})`)}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+          className="w-full py-3 px-3.5 pr-9 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all"
+          style={{
+            background: "linear-gradient(180deg, rgba(17,21,32,0.96) 0%, rgba(11,15,24,0.96) 100%)",
+            border: "1px solid var(--border-bright)",
+            color: "var(--text-primary)",
+            fontFamily: "var(--font-mono)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = `var(--${accentFocus})`;
+            e.target.style.boxShadow = `0 0 0 3px color-mix(in srgb, var(--${accentFocus}) 18%, transparent), inset 0 1px 0 rgba(255,255,255,0.04)`;
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "var(--border-bright)";
+            e.target.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.04)";
+          }}
         >
           {children}
         </select>
-        <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-tertiary)" }} />
+        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-secondary)" }} />
       </div>
     </div>
   );
@@ -100,45 +113,52 @@ function InputField({
 }) {
   return (
     <div>
-      <label className="block text-xs mb-1.5 uppercase tracking-wider" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-        {label}
+      <label className="block text-[11px] mb-2 uppercase tracking-[0.16em] font-semibold" style={{ color: "#edf4ff", fontFamily: "var(--font-mono)", textShadow: "0 0 18px rgba(255,255,255,0.05)" }}>
+        {label}{required && <span style={{ color: "var(--error)" }}> *</span>}
       </label>
       <div className="relative">
-        {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>{prefix}</span>}
-        {Icon && <Icon size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-tertiary)" }} />}
+        {prefix && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>{prefix}</span>}
+        {Icon && <Icon size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-secondary)" }} />}
         <input
           type={type}
           required={required}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full py-2.5 rounded-lg text-sm outline-none transition-all"
+          className="w-full py-3 rounded-xl text-sm outline-none transition-all placeholder:text-[#64748b]"
           style={{
-            paddingLeft: (prefix || Icon) ? "1.75rem" : "0.75rem",
-            paddingRight: "0.75rem",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
+            paddingLeft: (prefix || Icon) ? "1.95rem" : "0.9rem",
+            paddingRight: "0.9rem",
+            background: "linear-gradient(180deg, rgba(17,21,32,0.96) 0%, rgba(11,15,24,0.96) 100%)",
+            border: "1px solid var(--border-bright)",
             color: "var(--text-primary)",
             fontFamily: "var(--font-mono)",
             fontSize: fontSize ?? "13px",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
           }}
-          onFocus={(e) => (e.target.style.borderColor = `var(--${accentFocus})`)}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+          onFocus={(e) => {
+            e.target.style.borderColor = `var(--${accentFocus})`;
+            e.target.style.boxShadow = `0 0 0 3px color-mix(in srgb, var(--${accentFocus}) 18%, transparent), inset 0 1px 0 rgba(255,255,255,0.04)`;
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "var(--border-bright)";
+            e.target.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.04)";
+          }}
         />
       </div>
-      {hint && <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>{hint}</p>}
+      {hint && <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>{hint}</p>}
     </div>
   );
 }
 
 function SectionDivider({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
-    <div className="flex items-center gap-2 pt-1 pb-0.5">
-      <Icon size={12} style={{ color: "var(--text-tertiary)" }} />
-      <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+    <div className="flex items-center gap-2 pt-2 pb-1">
+      <Icon size={12} style={{ color: "var(--text-secondary)" }} />
+      <span className="text-[11px] uppercase tracking-[0.2em] font-semibold" style={{ color: "#dbe7ff", fontFamily: "var(--font-mono)" }}>
         {label}
       </span>
-      <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+      <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, var(--border-bright), transparent)" }} />
     </div>
   );
 }
@@ -324,6 +344,7 @@ function RedeemFlow({
 
 export default function RedeemPage() {
   const inst = PLACEHOLDER_INSTITUTION;
+  const wallet = usePhantomWallet();
   const [stablecoins, setStablecoins] = useState<any[]>([]);
   const [requests, setRequests] = useState<RedeemRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -369,6 +390,17 @@ export default function RedeemPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    const connectedAddress = wallet.address;
+    if (!connectedAddress) return;
+    setForm((current) => {
+      if (current.sourceWallet && current.sourceWallet !== inst.walletAddress) {
+        return current;
+      }
+      return { ...current, sourceWallet: connectedAddress };
+    });
+  }, [inst.walletAddress, wallet.address]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -426,9 +458,42 @@ export default function RedeemPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-1 space-y-4 animate-fade-in stagger-1">
-          <Card>
+          <Card
+            className="relative overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg, rgba(13,16,24,0.98) 0%, rgba(8,10,16,0.98) 100%)",
+              border: "1px solid var(--border-bright)",
+              boxShadow: "0 22px 40px rgba(0,0,0,0.28)",
+            }}
+          >
             <SectionHeader title="New Redeem Request" subtitle="Burn tokens · settle fiat" />
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div
+                className="grid grid-cols-2 gap-2 rounded-xl p-3"
+                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+              >
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                    Redemption flow
+                  </p>
+                  <p className="text-sm mt-1 font-semibold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
+                    Burn first, settle fiat after
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                    Settlement
+                  </p>
+                  <p className="text-sm mt-1 font-semibold" style={{ color: "var(--info)", fontFamily: "var(--font-display)" }}>
+                    T+1 issuer SLA
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className="space-y-4 rounded-xl p-4"
+                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+              >
 
               {/* Network */}
               <SelectField label="Network" value={form.network} onChange={set("network")}>
@@ -467,17 +532,28 @@ export default function RedeemPage() {
                 label="Source Wallet"
                 value={form.sourceWallet}
                 onChange={set("sourceWallet")}
-                placeholder="Solana wallet address"
+                placeholder={wallet.connected ? "Connected Phantom wallet" : "Solana wallet address"}
                 required
                 fontSize="11px"
+                hint={
+                  wallet.connected && wallet.shortAddress
+                    ? `Connected Phantom: ${wallet.shortAddress}`
+                    : "Use the wallet that currently holds the tokens you want to redeem."
+                }
               />
+              </div>
 
               {/* ── Fiat settlement section ── */}
               <SectionDivider icon={Building2} label="Fiat Settlement Details" />
 
-              <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.06)", border: "1px solid rgba(56,189,248,0.2)" }}>
+              <div
+                className="space-y-4 rounded-xl p-4"
+                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+              >
+
+              <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.28)" }}>
                 <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
-                <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                   Fiat will be wired to the account below after tokens are confirmed burned on-chain. Bank details are encrypted in travel rule filing.
                 </p>
               </div>
@@ -514,9 +590,15 @@ export default function RedeemPage() {
                   placeholder="e.g. NWBKGB2L"
                 />
               </div>
+              </div>
 
               {/* ── Off-chain transfer linkage ── */}
               <SectionDivider icon={Banknote} label="Off-chain Transfer Linkage" />
+
+              <div
+                className="space-y-4 rounded-xl p-4"
+                style={{ background: "rgba(10,14,22,0.78)", border: "1px solid var(--border)" }}
+              >
 
               <SelectField label="Payment Rails" value={form.paymentRails} onChange={set("paymentRails")}>
                 {["SWIFT", "SEPA", "CHAPS", "ACH", "FPS", "IMPS", "RTGS"].map((r) => (
@@ -555,13 +637,14 @@ export default function RedeemPage() {
                   Settlement window is defined by the issuer. Contact your account manager to discuss expedited settlement.
                 </p>
               </div>
+              </div>
 
               {/* Compliance notice */}
-              <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.06)", border: "1px solid rgba(56,189,248,0.2)" }}>
+              <div className="p-3 rounded-lg flex gap-2.5" style={{ background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.28)" }}>
                 <Info size={13} style={{ color: "var(--info)", flexShrink: 0, marginTop: "1px" }} />
                 <div>
                   <p className="text-xs font-medium" style={{ color: "var(--info)" }}>Travel Rule Filing</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-[12px] mt-0.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                     FATF Travel Rule data will be automatically filed. Bank details are encrypted in transit.
                   </p>
                 </div>
