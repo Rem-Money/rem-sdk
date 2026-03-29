@@ -46,6 +46,8 @@ interface MintFlowStep {
   failed?: boolean;
 }
 
+const MINT_COMPLIANCE_ANIMATION_MS = 2000;
+
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 }
@@ -182,15 +184,47 @@ function SectionDivider({ icon: Icon, label }: { icon: React.ElementType; label:
   );
 }
 
-function TransactionFlow({ request }: { request: MintRequestRecord }) {
+function TransactionFlow({
+  request,
+  animateCompliance = false,
+  onAnimationComplete,
+}: {
+  request: MintRequestRecord;
+  animateCompliance?: boolean;
+  onAnimationComplete?: () => void;
+}) {
   const tr = request.travelRuleData ?? {};
   const bank = tr.bankTransferDetails ?? {};
+  const [animatedStep, setAnimatedStep] = useState(1);
 
   // All compliance steps are verified at submission time.
   // On-chain mint is the only step that requires issuer action.
   const complianceDone = request.complianceStatus === "APPROVED";
   const onChainDone = request.status === "COMPLETED";
   const onChainFailed = request.status === "FAILED";
+  const shouldAnimateCompliance =
+    animateCompliance &&
+    request.status === "APPROVED" &&
+    request.complianceStatus === "APPROVED";
+  const revealedStep = shouldAnimateCompliance ? animatedStep : 5;
+
+  useEffect(() => {
+    if (!shouldAnimateCompliance) return;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let step = 2; step <= 5; step += 1) {
+      timers.push(
+        setTimeout(() => {
+          setAnimatedStep(step);
+          if (step === 5) onAnimationComplete?.();
+        }, (step - 1) * MINT_COMPLIANCE_ANIMATION_MS)
+      );
+    }
+
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, [onAnimationComplete, shouldAnimateCompliance]);
 
   const steps: MintFlowStep[] = [
     {
@@ -202,14 +236,14 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
     {
       id: 2,
       label: "KYC / Identity Check",
-      done: complianceDone || request.kycVerified,
+      done: shouldAnimateCompliance ? revealedStep >= 2 : complianceDone || request.kycVerified,
       detail: "Institution KYC verified via Jumio · LEI validated",
       badge: "VERIFIED",
     },
     {
       id: 3,
       label: "AML Screening",
-      done: complianceDone || !!request.amlScreening,
+      done: shouldAnimateCompliance ? revealedStep >= 3 : complianceDone || !!request.amlScreening,
       detail: request.amlScreening
         ? `OFAC · FinCEN · EU Sanctions · UN Sanctions — Risk Score: ${request.amlScreening.riskScore}/100`
         : "AML screening pending",
@@ -218,7 +252,7 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
     {
       id: 4,
       label: "Travel Rule Filing",
-      done: complianceDone || !!request.travelRuleData,
+      done: shouldAnimateCompliance ? revealedStep >= 4 : complianceDone || !!request.travelRuleData,
       detail: request.travelRuleData
         ? `FATF compliant · Originator: ${tr.originatorName} · LEI: ${tr.originatorLEI}`
         : "Travel rule data pending",
@@ -227,7 +261,7 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
     {
       id: 5,
       label: "Compliance Approved",
-      done: complianceDone,
+      done: shouldAnimateCompliance ? revealedStep >= 5 : complianceDone,
       detail: complianceDone
         ? "KYC · AML · Travel Rule all cleared · Awaiting issuer mint"
         : "Awaiting compliance review",
@@ -254,7 +288,7 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
         : onChainFailed
           ? request.txError ?? "Mint failed"
           : complianceDone
-            ? "Run: node scripts/approve-mint.mjs " + request.id
+            ? "Request Id: " + request.id
             : "Pending compliance",
       txSig: request.txSignature,
       badge: onChainDone ? "COMPLETED" : onChainFailed ? "FAILED" : "PENDING",
@@ -265,6 +299,11 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
     <div className="space-y-0">
       {steps.map((step, idx) => {
         const isLast = idx === steps.length - 1;
+        const stepChecking =
+          shouldAnimateCompliance &&
+          step.id >= 2 &&
+          step.id <= 5 &&
+          revealedStep === step.id - 1;
         return (
           <div key={step.id} className="flex gap-3">
             <div className="flex flex-col items-center">
@@ -281,6 +320,8 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
               >
                 {step.failed ? (
                   <XCircle size={12} style={{ color: "var(--error)" }} />
+                ) : stepChecking ? (
+                  <Loader2 size={11} className="animate-spin" style={{ color: "var(--accent)" }} />
                 ) : step.done ? (
                   <CheckCircle2 size={12} style={{ color: "var(--success)" }} />
                 ) : (
@@ -308,6 +349,19 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
                   {step.label}
                 </span>
                 {step.badge && <StatusBadge status={step.badge} />}
+                {stepChecking && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded"
+                    style={{
+                      background: "rgba(245,158,11,0.1)",
+                      color: "var(--warning)",
+                      border: "1px solid rgba(245,158,11,0.25)",
+                      fontFamily: "var(--font-mono)",
+                    }}
+                  >
+                    CHECKING
+                  </span>
+                )}
               </div>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
                 {step.detail}
@@ -335,7 +389,19 @@ function TransactionFlow({ request }: { request: MintRequestRecord }) {
   );
 }
 
-function RequestRow({ request, onExpand, expanded }: { request: MintRequestRecord; onExpand: () => void; expanded: boolean }) {
+function RequestRow({
+  request,
+  onExpand,
+  expanded,
+  animateCompliance = false,
+  onAnimationComplete,
+}: {
+  request: MintRequestRecord;
+  onExpand: () => void;
+  expanded: boolean;
+  animateCompliance?: boolean;
+  onAnimationComplete?: () => void;
+}) {
   const bank = request.travelRuleData?.bankTransferDetails;
   return (
     <>
@@ -391,7 +457,12 @@ function RequestRow({ request, onExpand, expanded }: { request: MintRequestRecor
                 <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
                   Transaction Flow
                 </h4>
-                <TransactionFlow request={request} />
+                <TransactionFlow
+                  key={`${request.id}-${animateCompliance ? "animate" : "static"}`}
+                  request={request}
+                  animateCompliance={animateCompliance}
+                  onAnimationComplete={onAnimationComplete}
+                />
               </div>
               <div className="space-y-4">
                 {/* Bank Transfer Details */}
@@ -469,6 +540,7 @@ export default function MintPage() {
   const [result, setResult] = useState<MintSubmissionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [animatedRequestId, setAnimatedRequestId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     network: "solana-devnet",
@@ -556,7 +628,10 @@ export default function MintPage() {
         setResult(data);
         const reqsRes = await fetch("/api/mint-request");
         setRequests((await reqsRes.json()) as MintRequestRecord[]);
-        if (data.mintRequest?.id) setExpandedId(data.mintRequest.id);
+        if (data.mintRequest?.id) {
+          setExpandedId(data.mintRequest.id);
+          setAnimatedRequestId(data.mintRequest.id);
+        }
         setForm((f) => ({ ...f, amount: "", wireReference: "", sendingBank: "", bankSwiftBic: "" }));
       }
     } catch (err: unknown) {
@@ -937,6 +1012,10 @@ export default function MintPage() {
                         key={r.id}
                         request={r}
                         expanded={expandedId === r.id}
+                        animateCompliance={animatedRequestId === r.id}
+                        onAnimationComplete={() => {
+                          setAnimatedRequestId((current) => (current === r.id ? null : current));
+                        }}
                         onExpand={() => setExpandedId(expandedId === r.id ? null : r.id)}
                       />
                     ))}

@@ -102,7 +102,7 @@ When an institution submits a mint request, the following gates run **synchronou
 ```
 1. KYC Check          institution.kycStatus === "VERIFIED"        → blocks if not verified
 2. AML Screening      simulated risk score + institution AML flag  → blocks if FLAGGED
-3. Travel Rule        FATF-compliant filing built and stored       → always passes in demo
+3. Travel Rule        FATF-compliant filing built and stored       → passes through compliance engine
 4. Compliance Record  created with status = APPROVED               → stored with full audit data
    └─ status set to APPROVED, complianceStatus = APPROVED
    └─ on-chain mint is NOT triggered here
