@@ -1,4 +1,5 @@
 // Run once to seed initial data: POST /api/seed
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { PLACEHOLDER_INSTITUTION } from "./placeholder-entity";
 
@@ -21,7 +22,7 @@ function mockAml(riskScore: number, status: "CLEAR" | "FLAGGED" | "PENDING" = "C
   };
 }
 
-function mockTravelRule(overrides: Record<string, unknown> = {}) {
+function mockTravelRule(overrides: Record<string, unknown> = {}): Prisma.InputJsonValue {
   return {
     originatorName: PLACEHOLDER_INSTITUTION.name,
     originatorLEI: PLACEHOLDER_INSTITUTION.leiCode,
@@ -217,7 +218,7 @@ export async function seed() {
       complianceStatus: "PENDING",
       kycVerified: true,
       amlScreening: mockAml(0, "PENDING"),
-      travelRuleData: null,
+      travelRuleData: Prisma.JsonNull,
       createdAt: daysAgo(1),
       updatedAt: daysAgo(1),
     },
@@ -277,8 +278,8 @@ export async function seed() {
     kycVerified: boolean;
     txSignature?: string;
     txError?: string;
-    amlScreening: object;
-    travelRuleData: object | null;
+    amlScreening: Prisma.InputJsonValue;
+    travelRuleData: Prisma.InputJsonValue | typeof Prisma.JsonNull;
     fiatSettlementStatus: string;
     fiatReference?: string;
     fiatConfirmedAt?: Date;
