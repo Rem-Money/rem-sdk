@@ -9,12 +9,11 @@ import {
   ArrowDownCircle,
   ShieldCheck,
   History,
-  Zap,
   ChevronRight,
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/mint", label: "Mint Request", icon: ArrowUpCircle },
   { href: "/redeem", label: "Redeem Request", icon: ArrowDownCircle },
   { href: "/compliance", label: "Compliance Hub", icon: ShieldCheck },

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ShieldCheck, ChevronDown, Wallet2, PlugZap, LogOut } from "lucide-react";
 import { PLACEHOLDER_INSTITUTION } from "@/lib/placeholder-entity";
 import { usePhantomWallet } from "@/components/PhantomWalletProvider";
@@ -8,6 +9,7 @@ import { useMockAuth } from "@/components/MockAuthProvider";
 
 export function TopBar() {
   const inst = PLACEHOLDER_INSTITUTION;
+  const router = useRouter();
   const wallet = usePhantomWallet();
   const auth = useMockAuth();
 
@@ -147,7 +149,10 @@ export function TopBar() {
         </button>
         <button
           type="button"
-          onClick={auth.signOut}
+          onClick={() => {
+            auth.signOut();
+            router.push("/");
+          }}
           className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors"
           style={{
             background: "var(--bg-elevated)",
