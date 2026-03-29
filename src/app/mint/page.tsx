@@ -57,6 +57,50 @@ function truncate(s: string, len = 12) {
   return s.length > len * 2 ? `${s.slice(0, len)}…${s.slice(-6)}` : s;
 }
 
+function formatDetailValue(key: string, value: unknown) {
+  const text = Array.isArray(value) ? value.join(", ") : String(value ?? "—");
+  const compactKeys = new Set([
+    "originatorWallet",
+    "beneficiaryWallet",
+    "wireReference",
+    "originatorLEI",
+    "screeningId",
+    "vaspId",
+  ]);
+
+  return compactKeys.has(key) ? truncate(text, 8) : text;
+}
+
+function isExplorerAddressKey(key: string) {
+  return key === "originatorWallet" || key === "beneficiaryWallet";
+}
+
+function renderDetailValue(key: string, value: unknown) {
+  const text = Array.isArray(value) ? value.join(", ") : String(value ?? "—");
+
+  if (isExplorerAddressKey(key) && text !== "—") {
+    return (
+      <a
+        href={`https://explorer.solana.com/address/${text}?cluster=devnet`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={text}
+        className="inline-flex items-center gap-1"
+        style={{ color: "var(--accent)" }}
+      >
+        {truncate(text, 8)}
+        <ExternalLink size={10} />
+      </a>
+    );
+  }
+
+  return (
+    <span title={text} style={{ color: "var(--text-secondary)" }}>
+      {formatDetailValue(key, value)}
+    </span>
+  );
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -413,12 +457,23 @@ function RequestRow({
         </td>
         <td style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{fmt(request.amount)}</td>
         <td style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-secondary)" }}>
-          {truncate(request.destinationWallet, 10)}
+          <a
+            href={`https://explorer.solana.com/address/${request.destinationWallet}?cluster=devnet`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1"
+            style={{ color: "var(--accent)" }}
+            onClick={(e) => e.stopPropagation()}
+            title={request.destinationWallet}
+          >
+            {truncate(request.destinationWallet, 10)}
+            <ExternalLink size={10} />
+          </a>
         </td>
         <td>
           {bank?.wireReference ? (
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--success-dim)", color: "var(--success)" }}>
-              {String(bank.wireReference)}
+              {truncate(String(bank.wireReference), 8)}
             </span>
           ) : (
             <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>—</span>
@@ -475,7 +530,7 @@ function RequestRow({
                       {Object.entries(request.travelRuleData.bankTransferDetails ?? {}).map(([k, v]) => (
                         <div key={k} className="flex gap-2">
                           <span style={{ color: "var(--text-tertiary)", minWidth: "160px", flexShrink: 0 }}>{k}</span>
-                          <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
+                          {renderDetailValue(k, v)}
                         </div>
                       ))}
                     </div>
@@ -492,7 +547,7 @@ function RequestRow({
                         .map(([k, v]) => (
                           <div key={k} className="flex gap-2">
                             <span style={{ color: "var(--text-tertiary)", minWidth: "160px", flexShrink: 0 }}>{k}</span>
-                            <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
+                            {renderDetailValue(k, v)}
                           </div>
                         ))}
                     </div>
@@ -511,8 +566,11 @@ function RequestRow({
                         .map(([k, v]) => (
                           <div key={k} className="flex gap-2">
                             <span style={{ color: "var(--text-tertiary)", minWidth: "120px", flexShrink: 0 }}>{k}</span>
-                            <span style={{ color: Array.isArray(v) ? "var(--text-secondary)" : v === "CLEAR" ? "var(--success)" : "var(--text-secondary)" }}>
-                              {Array.isArray(v) ? (v as string[]).join(", ") : String(v)}
+                            <span
+                              title={Array.isArray(v) ? (v as string[]).join(", ") : String(v)}
+                              style={{ color: Array.isArray(v) ? "var(--text-secondary)" : v === "CLEAR" ? "var(--success)" : "var(--text-secondary)" }}
+                            >
+                              {formatDetailValue(k, v)}
                             </span>
                           </div>
                         ))}

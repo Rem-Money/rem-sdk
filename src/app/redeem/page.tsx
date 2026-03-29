@@ -52,6 +52,50 @@ function truncate(s: string, len = 12) {
   return s.length > len * 2 ? `${s.slice(0, len)}…${s.slice(-6)}` : s;
 }
 
+function formatDetailValue(key: string, value: unknown) {
+  const text = Array.isArray(value) ? value.join(", ") : String(value ?? "—");
+  const compactKeys = new Set([
+    "originatorWallet",
+    "beneficiaryWallet",
+    "transferReference",
+    "originatorLEI",
+    "screeningId",
+    "vaspId",
+  ]);
+
+  return compactKeys.has(key) ? truncate(text, 8) : text;
+}
+
+function isExplorerAddressKey(key: string) {
+  return key === "originatorWallet" || key === "beneficiaryWallet";
+}
+
+function renderDetailValue(key: string, value: unknown) {
+  const text = Array.isArray(value) ? value.join(", ") : String(value ?? "—");
+
+  if (isExplorerAddressKey(key) && text !== "—") {
+    return (
+      <a
+        href={`https://explorer.solana.com/address/${text}?cluster=devnet`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={text}
+        className="inline-flex items-center gap-1"
+        style={{ color: "var(--accent)" }}
+      >
+        {truncate(text, 8)}
+        <ExternalLink size={10} />
+      </a>
+    );
+  }
+
+  return (
+    <span title={text} style={{ color: "var(--text-secondary)" }}>
+      {formatDetailValue(key, value)}
+    </span>
+  );
+}
+
 function SelectField({
   label, value, onChange, children, accentFocus = "info", disabled = false,
 }: {
@@ -805,7 +849,20 @@ export default function RedeemPage() {
                           >
                             <td><span className="px-2 py-0.5 rounded text-xs" style={{ background: "var(--info-dim)", color: "var(--info)", fontFamily: "var(--font-mono)" }}>{r.stablecoin?.symbol}</span></td>
                             <td style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{fmt(r.amount)}</td>
-                            <td style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-secondary)" }}>{truncate(r.sourceWallet, 10)}</td>
+                            <td style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-secondary)" }}>
+                              <a
+                                href={`https://explorer.solana.com/address/${r.sourceWallet}?cluster=devnet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1"
+                                style={{ color: "var(--accent)" }}
+                                onClick={(e) => e.stopPropagation()}
+                                title={r.sourceWallet}
+                              >
+                                {truncate(r.sourceWallet, 10)}
+                                <ExternalLink size={10} />
+                              </a>
+                            </td>
                             <td style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
                               {settlement.beneficiaryBank ? (
                                 <div>
@@ -848,7 +905,7 @@ export default function RedeemPage() {
                                           {Object.entries(r.travelRuleData.settlementDetails).map(([k, v]) => (
                                             <div key={k} className="flex gap-2">
                                               <span style={{ color: "var(--text-tertiary)", minWidth: "160px", flexShrink: 0 }}>{k}</span>
-                                              <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
+                                              {renderDetailValue(k, v)}
                                             </div>
                                           ))}
                                         </div>
@@ -865,7 +922,7 @@ export default function RedeemPage() {
                                             .map(([k, v]) => (
                                               <div key={k} className="flex gap-2">
                                                 <span style={{ color: "var(--text-tertiary)", minWidth: "170px", flexShrink: 0 }}>{k}</span>
-                                                <span style={{ color: "var(--text-secondary)" }}>{String(v)}</span>
+                                                {renderDetailValue(k, v)}
                                               </div>
                                             ))}
                                         </div>
