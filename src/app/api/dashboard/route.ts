@@ -14,6 +14,24 @@ type StablecoinRow = {
   createdAt: Date;
 };
 
+type MintRequestRow = {
+  status: string;
+  amount: number;
+  stablecoin: StablecoinRow;
+  createdAt: Date;
+};
+
+type RedeemRequestRow = {
+  status: string;
+  amount: number;
+  stablecoin: StablecoinRow;
+  createdAt: Date;
+};
+
+type ComplianceRow = {
+  status: string;
+};
+
 export async function GET() {
   try {
     const [mintRequests, redeemRequests, complianceRecords, stablecoins] =
@@ -65,15 +83,15 @@ export async function GET() {
     }));
 
     const totalMinted = mintRequests
-      .filter((r) => r.status === "COMPLETED")
-      .reduce((sum, r) => sum + r.amount, 0);
+      .filter((r: MintRequestRow) => r.status === "COMPLETED")
+      .reduce((sum: number, r: MintRequestRow) => sum + r.amount, 0);
 
     const totalRedeemed = redeemRequests
-      .filter((r) => r.status === "COMPLETED")
-      .reduce((sum, r) => sum + r.amount, 0);
+      .filter((r: RedeemRequestRow) => r.status === "COMPLETED")
+      .reduce((sum: number, r: RedeemRequestRow) => sum + r.amount, 0);
 
     const pendingCompliance = complianceRecords.filter(
-      (r) => r.status === "IN_REVIEW" || r.status === "PENDING"
+      (r: ComplianceRow) => r.status === "IN_REVIEW" || r.status === "PENDING"
     ).length;
 
     return NextResponse.json({
