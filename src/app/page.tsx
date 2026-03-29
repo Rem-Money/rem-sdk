@@ -99,10 +99,10 @@ export default function HomePage() {
                 <ShieldCheck size={16} style={{ color: "var(--accent)" }} />
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.28em]" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-                    Secure Access
+                    Institutional Access
                   </p>
                   <p className="text-sm mt-0.5" style={{ color: "var(--text-primary)" }}>
-                    Demo institutional workspace
+                    Secure operator sign-in
                   </p>
                 </div>
               </div>
@@ -112,13 +112,13 @@ export default function HomePage() {
                   Treasury • Compliance • Settlement
                 </p>
                 <h1
-                  className="text-[2.9rem] md:text-[3.2rem] xl:text-[3.4rem] leading-[1.02] mt-4"
+                  className="text-[2.5rem] md:text-[2.8rem] xl:text-[3rem] leading-[1.02] mt-4"
                   style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
                 >
-                  Launch the REM ops dashboard from a dedicated homepage.
+                  Manage stablecoin operations with REM.
                 </h1>
                 <p className="text-[15px] leading-7 mt-5 max-w-2xl" style={{ color: "rgba(240,244,255,0.76)" }}>
-                  Start from a public-facing entry point, authenticate with mock institutional SSO, and then continue into the protected dashboard for mint, redeem, compliance, and transaction workflows.
+                  Review compliance, monitor transactions, and move from request to settlement in a secure Solana-based workflow built for treasury and operations teams.
                 </p>
               </div>
 
@@ -152,12 +152,12 @@ export default function HomePage() {
               <div className="grid md:grid-cols-2 gap-4 mt-10">
                 {[
                   {
-                    title: "Protected dashboard",
-                    body: "Operational data and navigation now sit behind authentication instead of loading immediately on the root route.",
+                    title: "Unified compliance review",
+                    body: "Keep screening, review notes, and approval context in one place before funds move on-chain.",
                   },
                   {
-                    title: "Explicit sign-in",
-                    body: "Users land on a homepage first, then choose when to authenticate and continue into the secured workspace.",
+                    title: "Mint and redeem oversight",
+                    body: "Track issuance and redemption activity from request intake through settlement and confirmation.",
                   },
                 ].map((item) => (
                   <div
@@ -213,13 +213,13 @@ export default function HomePage() {
               >
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Institutional access</p>
                 <p className="text-[1.55rem] font-semibold mt-2 leading-tight text-slate-950">{auth.institutionName}</p>
-                <p className="text-sm mt-1.5 text-slate-500">Treasury and compliance operator profile</p>
+                <p className="text-sm mt-1.5 text-slate-500">Authorized treasury and compliance workspace</p>
 
                 <div className="mt-5 divide-y divide-slate-200/80 rounded-[10px] overflow-hidden border border-white/70 bg-white/90">
                   {[
                     { label: "Organization", value: auth.institutionName },
                     { label: "Identity provider", value: `${auth.providerName} · Mock SSO` },
-                    { label: "Destination", value: "Protected dashboard route" },
+                    { label: "Access", value: "Operations dashboard and workflows" },
                   ].map((item) => (
                     <div key={item.label} className="px-4 py-3.5">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
@@ -253,12 +253,12 @@ export default function HomePage() {
                     </>
                   ) : auth.authenticated ? (
                     <>
-                      Continue to dashboard
+                      Open dashboard
                       <ArrowRight size={16} />
                     </>
                   ) : (
                     <>
-                      Login to dashboard
+                      Sign in to continue
                       <ArrowRight size={16} />
                     </>
                   )}
@@ -266,7 +266,7 @@ export default function HomePage() {
               </div>
 
               <p className="text-xs leading-5 text-slate-500">
-                Demo sign-in only. The dashboard, mint, redeem, compliance, and transaction pages now require an authenticated session.
+                Demo access only. Sign in to open the operations dashboard, compliance tools, and transaction workflows.
               </p>
             </div>
           </section>
